@@ -80,7 +80,7 @@ export function CalculatorTab() {
         const maxFps = 1000 / (store.exposure + store.readout);
         const blur = (store.velocity / store.pixelSize) * store.exposure / 1000;
 
-        store.setResults({
+        (store as any).setResults({
           success: true,
           fovHorizontalMm: Math.round(fovHMm * 100) / 100,
           fovVerticalMm: Math.round(fovVMm * 100) / 100,
@@ -118,7 +118,7 @@ export function CalculatorTab() {
         const maxFps = 1000 / (store.exposure + store.readout);
         const blur = (store.velocity / store.pixelSize) * store.exposure / 1000;
 
-        store.setResults({
+        (store as any).setResults({
           success: true,
           fovHorizontalMm: Math.round(desiredFov * 100) / 100,
           fovVerticalMm: Math.round(fovVMm * 100) / 100,
@@ -130,7 +130,7 @@ export function CalculatorTab() {
         });
 
         // Actualizar WD en el store para que se vea en el gráfico
-        store.setWorkingDistance(calculatedWd);
+        (store as any).setWorkingDistance(calculatedWd);
 
         store.addToHistory({
           created_at: new Date().toISOString(),
@@ -160,7 +160,7 @@ export function CalculatorTab() {
         const maxFps = 1000 / (store.exposure + store.readout);
         const blur = (store.velocity / store.pixelSize) * store.exposure / 1000;
 
-        store.setResults({
+        (store as any).setResults({
           success: true,
           fovHorizontalMm: Math.round(desiredFov * 100) / 100,
           fovVerticalMm: Math.round(fovVMm * 100) / 100,
@@ -171,7 +171,7 @@ export function CalculatorTab() {
           focalLengthMm: Math.round(calculatedFocal * 100) / 100,
         });
 
-        store.setFocalLength(calculatedFocal);
+        (store as any).setFocalLength(calculatedFocal);
 
         store.addToHistory({
           created_at: new Date().toISOString(),
@@ -214,10 +214,10 @@ export function CalculatorTab() {
               onChange={(v) => {
                 setSensorFormat('custom');
                 const newWidth = typeof v === 'string' ? parseFloat(v) : v;
-                store.setSensorWidth(newWidth);
+                (store as any).setSensorWidth(newWidth);
                 // Auto-actualizar ResH basado en ancho y píxel
                 const newResH = Math.round((newWidth / (store.pixelSize / 1000)) * 100) / 100;
-                store.setResolutionH(newResH);
+                (store as any).setResolutionH(newResH);
               }}
               unit="mm"
               step="0.1"
@@ -231,10 +231,10 @@ export function CalculatorTab() {
               onChange={(v) => {
                 setSensorFormat('custom');
                 const newHeight = typeof v === 'string' ? parseFloat(v) : v;
-                store.setSensorHeight(newHeight);
+                (store as any).setSensorHeight(newHeight);
                 // Auto-actualizar ResV basado en alto y píxel
                 const newResV = Math.round((newHeight / (store.pixelSize / 1000)) * 100) / 100;
-                store.setResolutionV(newResV);
+                (store as any).setResolutionV(newResV);
               }}
               unit="mm"
               step="0.1"
@@ -245,7 +245,7 @@ export function CalculatorTab() {
               label="Píxel"
               type="number"
               value={store.pixelSize}
-              onChange={(v) => store.setPixelSize(typeof v === 'string' ? parseFloat(v) : v)}
+              onChange={(v) => (store as any).setPixelSize(typeof v === 'string' ? parseFloat(v) : v)}
               unit="µm"
               step="0.1"
               min={0.1}
@@ -257,10 +257,10 @@ export function CalculatorTab() {
               value={store.resolution_h}
               onChange={(v) => {
                 const newResH = typeof v === 'string' ? parseInt(v) : v;
-                store.setResolutionH(newResH);
+                (store as any).setResolutionH(newResH);
                 // Auto-actualizar Ancho basado en Res H y píxel
                 const newWidth = (newResH * store.pixelSize) / 1000; // píxel está en µm
-                store.setSensorWidth(Math.round(newWidth * 100) / 100);
+                (store as any).setSensorWidth(Math.round(newWidth * 100) / 100);
               }}
               unit="px"
               min={1}
@@ -272,10 +272,10 @@ export function CalculatorTab() {
               value={store.resolution_v}
               onChange={(v) => {
                 const newResV = typeof v === 'string' ? parseInt(v) : v;
-                store.setResolutionV(newResV);
+                (store as any).setResolutionV(newResV);
                 // Auto-actualizar Alto basado en Res V y píxel
                 const newHeight = (newResV * store.pixelSize) / 1000; // píxel está en µm
-                store.setSensorHeight(Math.round(newHeight * 100) / 100);
+                (store as any).setSensorHeight(Math.round(newHeight * 100) / 100);
               }}
               unit="px"
               min={1}
@@ -318,7 +318,7 @@ export function CalculatorTab() {
               label="Focal Length"
               type="number"
               value={store.focalLength}
-              onChange={(v) => store.setFocalLength(typeof v === 'string' ? parseFloat(v) : v)}
+              onChange={(v) => (store as any).setFocalLength(typeof v === 'string' ? parseFloat(v) : v)}
               unit="mm"
               step="0.1"
               min={0.1}
@@ -331,7 +331,7 @@ export function CalculatorTab() {
               value={convertFromMm(store.workingDistance, unit)}
               onChange={(v) => {
                 const mmValue = convertToMm(typeof v === 'string' ? parseFloat(v) : v, unit);
-                store.setWorkingDistance(mmValue);
+                (store as any).setWorkingDistance(mmValue);
               }}
               unit={unit}
               step="1"
@@ -372,7 +372,7 @@ export function CalculatorTab() {
               label="Exposición"
               type="number"
               value={store.exposure}
-              onChange={(v) => store.setExposure(typeof v === 'string' ? parseFloat(v) : v)}
+              onChange={(v) => (store as any).setExposure(typeof v === 'string' ? parseFloat(v) : v)}
               unit="ms"
               step="0.1"
               min={0.01}
@@ -382,7 +382,7 @@ export function CalculatorTab() {
               label="Velocidad"
               type="number"
               value={store.velocity}
-              onChange={(v) => store.setVelocity(typeof v === 'string' ? parseFloat(v) : v)}
+              onChange={(v) => (store as any).setVelocity(typeof v === 'string' ? parseFloat(v) : v)}
               unit="mm/s"
               step="10"
               min={0}
@@ -408,7 +408,7 @@ export function CalculatorTab() {
               label="Readout"
               type="number"
               value={store.readout}
-              onChange={(v) => store.setReadout(typeof v === 'string' ? parseFloat(v) : v)}
+              onChange={(v) => (store as any).setReadout(typeof v === 'string' ? parseFloat(v) : v)}
               unit="ms"
               step="0.1"
               min={0.01}
