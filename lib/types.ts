@@ -46,29 +46,29 @@ export interface SensorFormat {
 
 // Calculation Snapshot (saved for diagnostics)
 export interface CalculationSnapshot {
-  id: string;
-  user_id: string;
-  camera_model: string;
-  lens_model: string;
-  sensor_format: string;
-  sensor_width_mm: number;
-  sensor_height_mm: number;
-  pixel_size_um: number;
-  resolution_h: number;
-  resolution_v: number;
-  exposure_ms: number;
-  focal_length_mm: number;
-  working_distance_mm: number;
-  field_of_view_mm: number;
-  length_unit: 'mm' | 'cm' | 'in';
-  fov_is_horizontal: boolean;
+  id?: string;
+  user_id?: string;
+  camera_model?: string;
+  lens_model?: string;
+  sensor_format?: string;
+  sensor_width_mm?: number;
+  sensor_height_mm?: number;
+  pixel_size_um?: number;
+  resolution_h?: number;
+  resolution_v?: number;
+  exposure_ms?: number;
+  focal_length_mm?: number;
+  working_distance_mm?: number;
+  field_of_view_mm?: number;
+  length_unit?: 'mm' | 'cm' | 'in';
+  fov_is_horizontal?: boolean;
   result_focal_length?: number;
   result_working_distance?: number;
   result_fov_horizontal?: number;
   result_fov_vertical?: number;
   result_magnification?: number;
   result_max_fps?: number;
-  created_at: string;
+  created_at?: string;
 }
 
 // Preset
