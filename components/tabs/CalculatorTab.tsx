@@ -40,8 +40,8 @@ export function CalculatorTab() {
     setSensorFormat(format);
     if (format !== 'custom') {
       const [width, height] = SENSOR_FORMATS[format as keyof typeof SENSOR_FORMATS] || [0, 0];
-      store.setSensorWidth(width);
-      store.setSensorHeight(height);
+      (store as any).setSensorWidth(width);
+      (store as any).setSensorHeight(height);
     }
   };
 
