@@ -37,7 +37,7 @@ export function DiagnosticsTab() {
               <div key={idx} className="bg-slate-700 p-2 rounded border border-slate-600 text-xs">
                 <div className="flex justify-between items-start mb-1">
                   <h4 className="font-semibold text-white text-xs">#{idx + 1}</h4>
-                  <span className="text-xs text-slate-400">{new Date(calc.created_at).toLocaleTimeString()}</span>
+                  <span className="text-xs text-slate-400">{calc.created_at ? new Date(calc.created_at).toLocaleTimeString() : '-'}</span>
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
                   {calc.focal_length_mm && (
