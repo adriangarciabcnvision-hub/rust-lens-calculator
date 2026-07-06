@@ -501,12 +501,12 @@ export function CalculatorTab() {
                 </div>
                 <div className="bg-purple-900/30 border border-purple-700 p-2 rounded">
                   <p className="text-purple-300 text-xs">Spatial Res</p>
-                  <p className="text-purple-400 font-bold text-lg">{(store.results.spatialResolution * 1000)?.toFixed(3)}</p>
+                  <p className="text-purple-400 font-bold text-lg">{store.results.spatialResolution ? (store.results.spatialResolution * 1000).toFixed(3) : '-'}</p>
                   <p className="text-purple-300 text-xs">µm</p>
                 </div>
                 <div className="bg-orange-900/30 border border-orange-700 p-2 rounded">
                   <p className="text-orange-300 text-xs">Motion Blur</p>
-                  <p className="text-orange-400 font-bold text-lg">{store.results.motionBlurPixels?.toFixed(2)}</p>
+                  <p className="text-orange-400 font-bold text-lg">{store.results.motionBlurPixels?.toFixed(2) || '-'}</p>
                   <p className="text-orange-300 text-xs">px</p>
                 </div>
               </div>
