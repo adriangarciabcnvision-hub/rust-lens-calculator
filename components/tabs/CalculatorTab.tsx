@@ -305,7 +305,7 @@ export function CalculatorTab() {
                 label="Unidades"
                 type="select"
                 value={unit}
-                onChange={setUnit}
+                onChange={(v) => setUnit(String(v))}
                 options={[
                   { value: 'mm', label: 'Milímetros' },
                   { value: 'cm', label: 'Centímetros' },
