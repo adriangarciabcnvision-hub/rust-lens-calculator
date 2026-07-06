@@ -141,6 +141,8 @@ export interface OpticalCalculationResult {
   pixelHorizontal?: number;
   pixelVertical?: number;
   megapixels?: number;
+  spatialResolution?: number;
+  motionBlurPixels?: number;
   error?: string;
 }
 
