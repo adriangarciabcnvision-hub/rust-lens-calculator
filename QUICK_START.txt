@@ -1,0 +1,187 @@
+╔════════════════════════════════════════════════════════════════════╗
+║     🔬 RUST LENS CALCULATOR PRO - QUICK START                      ║
+║        Versión 2.0.0 - Calculadora Óptica Profesional             ║
+╚════════════════════════════════════════════════════════════════════╝
+
+⚡ INSTALACIÓN RÁPIDA (5 MINUTOS)
+
+Paso 1: Instalar dependencias
+────────────────────────────
+cd H:\Aplicaciones\Claude\RustLensCalculatorWeb
+npm install
+
+Paso 2: Configurar Supabase (OPCIONAL - funciona sin él)
+────────────────────────────────────────────────
+1. Copia .env.local.example → .env.local
+2. Si quieres BD: agrega keys de Supabase
+3. Si no quieres: deja vacío (funciona en modo local)
+
+Paso 3: Ejecutar
+────────────────
+npm run dev
+
+Paso 4: Abrir en navegador
+──────────────────────
+http://localhost:3000
+
+
+🎯 7 PESTAÑAS INCLUIDAS
+
+✅ 📊 CALCULADORA
+   - Cálculos ópticos: focal, distancia, FOV
+   - Magnification automática
+   - Resolución espacial
+
+✅ 📋 DIAGNÓSTICO
+   - Log de todos los cálculos
+   - Historial de hasta 50 últimos cálculos
+   - Copiar como texto
+
+✅ 📐 PROFUNDIDAD DE CAMPO
+   - DOF avanzada (distancia hiperfocal)
+   - Límites cercanos y lejanos
+   - Efecto de apertura (f-number)
+
+✅ 🔬 VISUALIZACIÓN ÓPTICA
+   - Diagrama esquemático del sistema
+   - Representación de sensor, lente, objeto
+   - Rayos ópticos automáticos
+
+✅ ⚡ FRAME RATE & BLUR
+   - FPS máximo calculado
+   - Motion blur en píxeles
+   - Indicadores de calidad
+
+✅ 🔄 COMPARADOR
+   - Cargar 2 configuraciones
+   - Comparación lado a lado
+   - Diferencias destacadas
+
+✅ 📖 LECTURA DE CÓDIGOS
+   - Legibilidad de barcode/QR
+   - Estándar AIM/ISO
+   - Veredicto: readable/marginal/not_readable
+
+
+🔧 CARACTERÍSTICAS AVANZADAS
+
+• Cálculos ópticos precisos (lente delgada)
+• Motion blur y análisis de rendimiento
+• Profundidad de campo compleja
+• Diagramas ópticos automáticos
+• Comparación de configuraciones
+• Historial de cálculos
+• UI responsiva (mobile/tablet/desktop)
+• TypeScript type-safe
+• Zustand para estado global
+• Supabase opcional para BD
+• Export/Import Excel (ready to add)
+• PDF export (ready to add)
+
+
+📊 FÓRMULAS IMPLEMENTADAS
+
+Óptica:
+  FOV = (SensorDim / Focal) * (WD + Focal)
+  Magnification = SensorWidth / FOV
+
+Motion Blur:
+  Blur = (Velocidad / TamañoPíxel) * Exposición / 1000
+
+Profundidad de Campo:
+  H = (f² / (N * c)) + f
+  Near = (H * s) / (H + (s - f))
+  Far = (H * s) / (H - (s - f))
+
+Legibilidad:
+  PixelsPerModule = ModuleSize / mmPerPixel
+  Verdict: readable si ≥ threshold * 2
+
+
+🚀 DESPLIEGUE EN PRODUCCIÓN
+
+Opción 1: Vercel (RECOMENDADO - gratis)
+──────────────────────────
+1. Sube a GitHub
+2. Ve a vercel.com
+3. Conecta repo
+4. Agrega env vars
+5. Deploy automático
+
+Opción 2: CLI Vercel
+───────────────
+npm i -g vercel
+vercel
+
+
+📁 ARCHIVOS CLAVE
+
+app/
+├── app/page.tsx          → Página con 7 pestañas
+├── api/lens/calculate    → API de cálculos
+└── layout.tsx
+
+components/
+├── ui/                   → Componentes reutilizables
+└── tabs/                 → Las 7 pestañas
+
+lib/
+├── calculationEngine.ts  → Motor de cálculos (de C#)
+├── store.ts             → Estado global Zustand
+├── types.ts             → TypeScript interfaces
+└── supabase.ts          → Cliente Supabase
+
+
+🛠️ TECNOLOGÍAS
+
+✓ Next.js 14
+✓ React 18
+✓ TypeScript
+✓ Tailwind CSS
+✓ Zustand (state management)
+✓ Supabase (opcional)
+✓ jsPDF (para export, ready to add)
+✓ XLSX (para import Excel, ready to add)
+
+
+❓ TROUBLESHOOTING
+
+Error: "Cannot find module..."
+→ npm install
+
+Error: "NEXT_PUBLIC_SUPABASE_URL is undefined"
+→ Verifica .env.local existe y contiene variables
+
+Puerto 3000 ocupado:
+→ npm run dev -- -p 3001
+
+Cálculos no funcionan:
+→ F12 → Console tab → mira errores
+→ Verifica valores de entrada sean positivos
+
+
+💡 NOTAS IMPORTANTES
+
+⚠️  Fórmulas usan aproximación paraxial (WD >> Focal)
+⚠️  Motion blur es teórico, no simula óptica real
+⚠️  DOF usa distancia hiperfocal clásica
+⚠️  Códigos: AIM/ISO, depende de contraste físico
+
+
+📞 AYUDA
+
+Documentación completa → README.md
+Detalles de instalación → INSTALLATION.md
+Issues o preguntas → Contacta al equipo
+
+
+════════════════════════════════════════════════════════════════════════
+
+¡LISTO PARA USAR! 🚀
+
+Ejecuta: npm run dev
+Abre:    http://localhost:3000
+
+Disfruta de la calculadora óptica profesional! ✨
+
+════════════════════════════════════════════════════════════════════════
