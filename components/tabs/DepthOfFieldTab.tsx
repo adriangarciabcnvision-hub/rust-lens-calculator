@@ -68,7 +68,7 @@ export function DepthOfFieldTab() {
               label="Número f"
               type="number"
               value={fNumber}
-              onChange={setFNumber}
+              onChange={(v) => setFNumber(Number(v))}
               step="0.1"
               tooltip="f-number de la lente"
             />
@@ -76,7 +76,7 @@ export function DepthOfFieldTab() {
               label="Blur Máximo"
               type="number"
               value={coc}
-              onChange={setCoc}
+              onChange={(v) => setCoc(Number(v))}
               unit="mm"
               step="0.001"
               tooltip="Círculo de confusión"
@@ -91,7 +91,7 @@ export function DepthOfFieldTab() {
                 label="Distancia Mín"
                 type="number"
                 value={minFocus}
-                onChange={setMinFocus}
+                onChange={(v) => setMinFocus(Number(v))}
                 unit="mm"
                 step="0.01"
                 min={0.1}

@@ -62,7 +62,7 @@ export function FrameRateTab() {
               label="Readout"
               type="number"
               value={readout}
-              onChange={setReadout}
+              onChange={(v) => setReadout(Number(v))}
               unit="ms"
               step="1"
             />
@@ -70,7 +70,7 @@ export function FrameRateTab() {
               label="FPS Máx (DS)"
               type="number"
               value={ratedMax}
-              onChange={setRatedMax}
+              onChange={(v) => setRatedMax(Number(v))}
               unit="fps"
               step="1"
               tooltip="Datasheet max"

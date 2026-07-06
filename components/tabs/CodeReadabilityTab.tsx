@@ -51,7 +51,7 @@ export function CodeReadabilityTab() {
               label="mm por píxel"
               type="number"
               value={mmPerPixel}
-              onChange={setMmPerPixel}
+              onChange={(v) => setMmPerPixel(Number(v))}
               step="0.001"
             />
             <button
@@ -69,7 +69,7 @@ export function CodeReadabilityTab() {
               label="Tamaño módulo"
               type="number"
               value={moduleSize}
-              onChange={setModuleSize}
+              onChange={(v) => setModuleSize(Number(v))}
               unit="mm"
               step="0.1"
             />
@@ -77,7 +77,7 @@ export function CodeReadabilityTab() {
               label="Umbral"
               type="number"
               value={threshold}
-              onChange={setThreshold}
+              onChange={(v) => setThreshold(Number(v))}
               unit="px"
               step="1"
               tooltip="AIM standard ≈ 3"
