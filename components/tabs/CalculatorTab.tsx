@@ -36,10 +36,11 @@ export function CalculatorTab() {
     return value;
   };
 
-  const handleSensorFormatChange = (format: string) => {
-    setSensorFormat(format);
-    if (format !== 'custom') {
-      const [width, height] = SENSOR_FORMATS[format as keyof typeof SENSOR_FORMATS] || [0, 0];
+  const handleSensorFormatChange = (format: string | number) => {
+    const formatStr = String(format);
+    setSensorFormat(formatStr);
+    if (formatStr !== 'custom') {
+      const [width, height] = SENSOR_FORMATS[formatStr as keyof typeof SENSOR_FORMATS] || [0, 0];
       (store as any).setSensorWidth(width);
       (store as any).setSensorHeight(height);
     }
