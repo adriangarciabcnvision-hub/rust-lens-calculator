@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { Card } from '@/components/ui/Card';
 import { FormInput } from '@/components/ui/FormInput';
 import { useCalculatorStore } from '@/lib/store';
+import { useDataStore, SavedSet } from '@/lib/dataStore';
+import { RequestDialog } from '@/components/RequestDialog';
 
 const SENSOR_FORMATS = {
   'custom': [0, 0],
@@ -16,12 +18,74 @@ const SENSOR_FORMATS = {
 
 export function CalculatorTab() {
   const store = useCalculatorStore();
+  const dataStore = useDataStore();
   const [sensorFormat, setSensorFormat] = useState('1/2.3"');
   const [calculationTarget, setCalculationTarget] = useState('fieldOfView');
   const [unit, setUnit] = useState('mm');
   const [desiredFov, setDesiredFov] = useState(50);
   const [desiredWd, setDesiredWd] = useState(25);
   const [error, setError] = useState('');
+  const [setName, setSetName] = useState('');
+  const [selectedCameraId, setSelectedCameraId] = useState('');
+  const [selectedLensId, setSelectedLensId] = useState('');
+  const [showRequestDialog, setShowRequestDialog] = useState(false);
+
+  const handleSelectCamera = (id: string) => {
+    setSelectedCameraId(id);
+    const cam = dataStore.cameras.find((c) => c.id === id);
+    if (!cam) return;
+    setSensorFormat('custom');
+    (store as any).setSensorWidth(cam.sensorWidth);
+    (store as any).setSensorHeight(cam.sensorHeight);
+    (store as any).setPixelSize(cam.pixelSize);
+    if (cam.resolutionH > 0) (store as any).setResolutionH(cam.resolutionH);
+    if (cam.resolutionV > 0) (store as any).setResolutionV(cam.resolutionV);
+    (store as any).setCamera({ display_name: cam.name });
+  };
+
+  const handleSelectLens = (id: string) => {
+    setSelectedLensId(id);
+    const lens = dataStore.lenses.find((l) => l.id === id);
+    if (!lens) return;
+    (store as any).setFocalLength(lens.focalLength);
+    (store as any).setLens({ display_name: lens.name });
+  };
+
+  const handleSaveSet = () => {
+    if (!store.results || !setName.trim()) return;
+    dataStore.saveSet({
+      name: setName.trim(),
+      params: {
+        sensorWidth: store.sensorWidth,
+        sensorHeight: store.sensorHeight,
+        pixelSize: store.pixelSize,
+        resolutionH: store.resolution_h,
+        resolutionV: store.resolution_v,
+        focalLength: store.focalLength,
+        workingDistance: store.workingDistance,
+        exposure: store.exposure,
+        readout: store.readout,
+        velocity: store.velocity,
+      },
+      results: store.results,
+    });
+    setSetName('');
+  };
+
+  const handleLoadSet = (saved: SavedSet) => {
+    setSensorFormat('custom');
+    (store as any).setSensorWidth(saved.params.sensorWidth);
+    (store as any).setSensorHeight(saved.params.sensorHeight);
+    (store as any).setPixelSize(saved.params.pixelSize);
+    (store as any).setResolutionH(saved.params.resolutionH);
+    (store as any).setResolutionV(saved.params.resolutionV);
+    (store as any).setFocalLength(saved.params.focalLength);
+    (store as any).setWorkingDistance(saved.params.workingDistance);
+    (store as any).setExposure(saved.params.exposure);
+    (store as any).setReadout(saved.params.readout);
+    (store as any).setVelocity(saved.params.velocity);
+    (store as any).setResults(saved.results);
+  };
 
   // Convertir valores según unidad
   const convertFromMm = (mmValue: number, targetUnit: string): number => {
@@ -194,12 +258,31 @@ export function CalculatorTab() {
   const isFocalLengthTarget = calculationTarget === 'focalLength';
 
   return (
-    <div className="grid grid-cols-6 gap-3 h-full overflow-hidden">
+    <div className="grid grid-cols-1 lg:grid-cols-6 gap-3 lg:h-full lg:overflow-hidden">
       {/* LEFT PANEL - INPUTS */}
-      <div className="col-span-3 space-y-2 overflow-y-auto pr-2">
+      <div className="lg:col-span-3 space-y-2 lg:overflow-y-auto lg:pr-2">
         {/* SENSOR SECTION */}
         <Card title="Sensor" icon="📊" className="p-2">
-          <div className="grid grid-cols-3 gap-2">
+          <div className="flex gap-2 mb-2">
+            <select
+              value={selectedCameraId}
+              onChange={(e) => handleSelectCamera(e.target.value)}
+              className="flex-1 min-w-0 px-2 py-1 text-sm bg-slate-700 text-amber-300 rounded border border-amber-700/50 focus:border-amber-500 focus:outline-none"
+            >
+              <option value="">📷 Cámara del catálogo…</option>
+              {dataStore.cameras.map((c) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+            <button
+              onClick={() => setShowRequestDialog(true)}
+              title="Solicitar añadir una cámara o lente al catálogo"
+              className="px-2 py-1 bg-slate-700 hover:bg-amber-600 text-white rounded text-xs transition flex-shrink-0"
+            >
+              ➕ Solicitar
+            </button>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
             <FormInput
               label="Formato"
               type="select"
@@ -287,6 +370,18 @@ export function CalculatorTab() {
 
         {/* OPTICAL SECTION */}
         <Card title="Óptica" icon="🔍" className="p-2">
+          {dataStore.lenses.length > 0 && (
+            <select
+              value={selectedLensId}
+              onChange={(e) => handleSelectLens(e.target.value)}
+              className="w-full mb-2 px-2 py-1 text-sm bg-slate-700 text-amber-300 rounded border border-amber-700/50 focus:border-amber-500 focus:outline-none"
+            >
+              <option value="">🔭 Lente del catálogo…</option>
+              {dataStore.lenses.map((l) => (
+                <option key={l.id} value={l.id}>{l.name} ({l.focalLength}mm{l.aperture ? `, ${l.aperture}` : ''})</option>
+              ))}
+            </select>
+          )}
           <div className="grid grid-cols-2 gap-2">
             <div>
               <label className="text-xs font-semibold text-slate-300">¿Qué calcular?</label>
@@ -443,7 +538,7 @@ export function CalculatorTab() {
       </div>
 
       {/* RIGHT PANEL - RESULTS */}
-      <div className="col-span-3 overflow-y-auto">
+      <div className="lg:col-span-3 lg:overflow-y-auto">
         <div className="space-y-2">
           {/* MAIN CALCULATION RESULT */}
           {store.results && (
@@ -535,6 +630,46 @@ export function CalculatorTab() {
             </div>
           </Card>
 
+          {/* SAVED SETS */}
+          <Card title="Sets guardados" icon="💾" className="p-2">
+            <div className="flex gap-2 mb-2">
+              <input
+                type="text"
+                placeholder="Nombre del set"
+                value={setName}
+                onChange={(e) => setSetName(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleSaveSet()}
+                className="flex-1 min-w-0 px-2 py-1 text-sm bg-slate-700 text-white rounded border border-slate-600 focus:border-amber-500 focus:outline-none"
+              />
+              <button
+                onClick={handleSaveSet}
+                disabled={!store.results || !setName.trim()}
+                title={!store.results ? 'Haz un cálculo primero' : 'Guardar la configuración actual'}
+                className="px-3 py-1 bg-amber-600 hover:bg-amber-700 disabled:bg-slate-600 disabled:cursor-not-allowed text-white rounded text-xs transition flex-shrink-0"
+              >
+                Guardar
+              </button>
+            </div>
+            {dataStore.savedSets.length ? (
+              <div className="space-y-1 max-h-40 overflow-y-auto">
+                {dataStore.savedSets.map((s) => (
+                  <div key={s.id} className="flex items-center justify-between gap-2 bg-slate-700 px-2 py-1 rounded text-xs">
+                    <span className="truncate">
+                      <span className="font-semibold">{s.name}</span>
+                      <span className="text-slate-400"> · f{s.params.focalLength}mm · WD {s.params.workingDistance}mm</span>
+                    </span>
+                    <span className="flex gap-1 flex-shrink-0">
+                      <button onClick={() => handleLoadSet(s)} className="px-2 py-0.5 bg-slate-600 hover:bg-amber-600 text-white rounded transition">Cargar</button>
+                      <button onClick={() => dataStore.removeSet(s.id)} className="px-2 py-0.5 bg-red-700 hover:bg-red-600 text-white rounded">✕</button>
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-slate-400">Calcula y guarda un set para reutilizarlo en el Comparador.</p>
+            )}
+          </Card>
+
           {/* TIMING METRICS */}
           <Card title="Tiempos" icon="⏱️" className="p-2">
             <div className="grid grid-cols-3 gap-2 text-xs">
@@ -557,6 +692,8 @@ export function CalculatorTab() {
           </Card>
         </div>
       </div>
+
+      {showRequestDialog && <RequestDialog onClose={() => setShowRequestDialog(false)} />}
     </div>
   );
 }

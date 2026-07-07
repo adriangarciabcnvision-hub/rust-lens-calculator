@@ -48,6 +48,8 @@ export interface SensorFormat {
 export interface CalculationSnapshot {
   id?: string;
   user_id?: string;
+  tab?: string;
+  summary?: string;
   camera_model?: string;
   lens_model?: string;
   sensor_format?: string;

@@ -230,9 +230,9 @@ export function OpticalDiagramTab() {
   }, [store.results, store.workingDistance, store.focalLength, store.sensorWidth, store.sensorHeight]);
 
   return (
-    <div className="grid grid-cols-6 gap-3 h-full overflow-hidden">
+    <div className="grid grid-cols-1 lg:grid-cols-6 gap-3 lg:h-full lg:overflow-hidden">
       {/* Canvas Principal */}
-      <div className="col-span-4">
+      <div className="lg:col-span-4">
         <Card title="Diagrama Óptico" icon="🔬">
           <div className="bg-slate-950 rounded border border-slate-700 overflow-hidden">
             <canvas
@@ -246,7 +246,7 @@ export function OpticalDiagramTab() {
       </div>
 
       {/* Parámetros e Información */}
-      <div className="col-span-2 space-y-2 overflow-y-auto">
+      <div className="lg:col-span-2 space-y-2 lg:overflow-y-auto">
         <Card title="Parámetros de Entrada" icon="⚙️" className="p-2">
           <div className="space-y-1 text-xs">
             <div className="flex justify-between bg-slate-700 p-1.5 rounded">

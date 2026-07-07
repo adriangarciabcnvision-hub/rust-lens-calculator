@@ -36,9 +36,13 @@ export function DiagnosticsTab() {
             {calculationHistory.map((calc, idx) => (
               <div key={idx} className="bg-slate-700 p-2 rounded border border-slate-600 text-xs">
                 <div className="flex justify-between items-start mb-1">
-                  <h4 className="font-semibold text-white text-xs">#{idx + 1}</h4>
-                  <span className="text-xs text-slate-400">{calc.created_at ? new Date(calc.created_at).toLocaleTimeString() : '-'}</span>
+                  <h4 className="font-semibold text-white text-xs">
+                    #{calculationHistory.length - idx}
+                    <span className="text-amber-400"> · {calc.tab || 'Calculadora'}</span>
+                  </h4>
+                  <span className="text-xs text-slate-400">{calc.created_at ? new Date(calc.created_at).toLocaleString() : '-'}</span>
                 </div>
+                {calc.summary && <p className="text-slate-300 text-xs mb-1">{calc.summary}</p>}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
                   {calc.focal_length_mm && (
                     <div>

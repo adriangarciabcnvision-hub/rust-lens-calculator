@@ -25,35 +25,49 @@ export default function LensCalculator() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const handleCalculate = async (e: React.FormEvent) => {
+  // Cálculo client-side: la app se sirve como export estático (sin API routes)
+  const handleCalculate = (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError('');
 
     try {
-      const response = await fetch('/api/lens/calculate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sensorWidthMm: parseFloat(sensorWidth),
-          sensorHeightMm: parseFloat(sensorHeight),
-          pixelSizeUm: parseFloat(pixelSize),
-          focalLengthMm: parseFloat(focalLength),
-          workingDistanceMm: parseFloat(workingDistance),
-          exposureMs: parseFloat(exposure),
-          readoutMs: parseFloat(readout),
-          velocityMmPerSec: parseFloat(velocity),
-          targetCalculation: 'fieldOfView'
-        })
-      });
+      const sensorW = parseFloat(sensorWidth);
+      const sensorH = parseFloat(sensorHeight);
+      const pixelUm = parseFloat(pixelSize);
+      const focal = parseFloat(focalLength);
+      const wd = parseFloat(workingDistance);
+      const exposureMs = parseFloat(exposure);
+      const readoutMs = parseFloat(readout);
+      const velocityMmPerSec = parseFloat(velocity);
 
-      const data = await response.json();
-
-      if (data.success) {
-        setResult(data);
-      } else {
-        setError(data.error || 'Calculation failed');
+      if (!sensorW || !sensorH || !pixelUm) {
+        setError('Los parámetros del sensor son obligatorios');
+        return;
       }
+      if (!focal || focal <= 0 || !wd || wd <= 0) {
+        setError('Focal y distancia de trabajo deben ser mayores a 0');
+        return;
+      }
+
+      // Triángulos semejantes: FOV = (SensorDim / Focal) × (WD + Focal)
+      const fovH = (sensorW / focal) * (wd + focal);
+      const fovV = (sensorH / focal) * (wd + focal);
+      const magnification = sensorW / fovH;
+      const maxFrameRate = 1000 / (exposureMs + readoutMs);
+      const motionBlurPixels = velocityMmPerSec > 0
+        ? (velocityMmPerSec / (pixelUm / 1000)) * exposureMs / 1000
+        : 0;
+
+      setResult({
+        focalLengthMm: focal,
+        workingDistanceMm: wd,
+        fovHorizontalMm: parseFloat(fovH.toFixed(2)),
+        fovVerticalMm: parseFloat(fovV.toFixed(2)),
+        magnification: parseFloat(magnification.toFixed(3)),
+        maxFrameRate: parseFloat(maxFrameRate.toFixed(1)),
+        motionBlurPixels: parseFloat(motionBlurPixels.toFixed(2)),
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error calculating');
     } finally {

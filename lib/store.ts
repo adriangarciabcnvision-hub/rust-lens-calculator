@@ -1,7 +1,8 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 import { CalculatorState, OpticalCalculationResult, MotionBlurResult, DepthOfFieldResult, CalculationSnapshot } from './types';
 
-export const useCalculatorStore = create<CalculatorState>((set) => ({
+export const useCalculatorStore = create<CalculatorState>()(persist((set) => ({
   // Initial state
   camera: null,
   lens: null,
@@ -83,6 +84,10 @@ export const useCalculatorStore = create<CalculatorState>((set) => ({
       dofResults: null,
     });
   },
+}), {
+  name: 'rust-lens-history',
+  // Solo el historial de cálculos sobrevive a recargas; el resto vuelve a valores por defecto
+  partialize: (state) => ({ calculationHistory: state.calculationHistory } as any),
 }));
 
 /**

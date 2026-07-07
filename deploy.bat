@@ -44,7 +44,7 @@ echo ✓ Pushed
 REM Step 5: Deploy to Cloudflare Pages
 echo.
 echo [5/5] Deploying to Cloudflare Pages...
-call wrangler pages deploy .next --project-name=rustlenscalculator
+call wrangler pages deploy out --project-name=rustlenscalculator
 if %errorlevel% neq 0 (
     echo Deployment failed!
     pause

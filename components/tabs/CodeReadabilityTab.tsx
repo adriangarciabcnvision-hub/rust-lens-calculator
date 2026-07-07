@@ -42,9 +42,9 @@ export function CodeReadabilityTab() {
   };
 
   return (
-    <div className="grid grid-cols-6 gap-3 h-full overflow-hidden">
+    <div className="grid grid-cols-1 lg:grid-cols-6 gap-3 lg:h-full lg:overflow-hidden">
       {/* LEFT INPUTS */}
-      <div className="col-span-3 space-y-2 overflow-y-auto pr-2">
+      <div className="lg:col-span-3 space-y-2 lg:overflow-y-auto lg:pr-2">
         <Card title="Resolución" icon="📐" className="p-2">
           <div className="space-y-2">
             <FormInput
@@ -100,7 +100,7 @@ export function CodeReadabilityTab() {
       </div>
 
       {/* RIGHT RESULTS */}
-      <div className="col-span-3 overflow-y-auto">
+      <div className="lg:col-span-3 lg:overflow-y-auto">
         <Card title="Legibilidad de Códigos" icon="✨" className="p-2">
           {results ? (
             <div className="space-y-2">

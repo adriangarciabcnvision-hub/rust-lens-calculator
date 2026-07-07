@@ -3,11 +3,28 @@
 import { useState } from 'react';
 import { Card } from '@/components/ui/Card';
 import { useCalculatorStore } from '@/lib/store';
+import { useDataStore, SavedSet } from '@/lib/dataStore';
 
 export function ComparatorTab() {
   const store = useCalculatorStore();
+  const { savedSets } = useDataStore();
   const [config1, setConfig1] = useState<any>(null);
   const [config2, setConfig2] = useState<any>(null);
+
+  const configFromSet = (saved: SavedSet) => ({
+    camera: saved.name,
+    lens: `${saved.params.sensorWidth}×${saved.params.sensorHeight}mm · ${saved.params.pixelSize}µm`,
+    focalLength: saved.params.focalLength,
+    workingDistance: saved.params.workingDistance,
+    results: saved.results,
+  });
+
+  const handleLoadSet = (slot: 1 | 2, id: string) => {
+    const saved = savedSets.find((s) => s.id === id);
+    if (!saved) return;
+    if (slot === 1) setConfig1(configFromSet(saved));
+    else setConfig2(configFromSet(saved));
+  };
 
   const handleLoadConfig1 = () => {
     if (store.results) {
@@ -39,21 +56,23 @@ export function ComparatorTab() {
   };
 
   return (
-    <div className="space-y-2 h-full overflow-hidden flex flex-col">
-      <div className="flex gap-2 mb-2">
+    <div className="space-y-2 lg:h-full lg:overflow-hidden flex flex-col">
+      <div className="flex flex-wrap gap-2 mb-2">
         <button
           onClick={handleLoadConfig1}
           disabled={!store.results}
+          title="Usa el último cálculo de la pestaña Calculadora"
           className="px-3 py-1 bg-amber-600 hover:bg-amber-700 disabled:bg-slate-600 text-white rounded transition text-xs"
         >
-          Config 1
+          Cálculo actual → 1
         </button>
         <button
           onClick={handleLoadConfig2}
           disabled={!store.results}
+          title="Usa el último cálculo de la pestaña Calculadora"
           className="px-3 py-1 bg-amber-600 hover:bg-amber-700 disabled:bg-slate-600 text-white rounded transition text-xs"
         >
-          Config 2
+          Cálculo actual → 2
         </button>
         <button
           onClick={handleSwap}
@@ -72,7 +91,36 @@ export function ComparatorTab() {
         </button>
       </div>
 
-      <div className="grid grid-cols-2 gap-2 flex-1 overflow-hidden">
+      {savedSets.length > 0 ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-2">
+          <select
+            value=""
+            onChange={(e) => handleLoadSet(1, e.target.value)}
+            className="px-2 py-1 text-sm bg-slate-700 text-white rounded border border-slate-600 focus:border-amber-500 focus:outline-none"
+          >
+            <option value="" disabled>💾 Cargar set guardado → Config 1</option>
+            {savedSets.map((s) => (
+              <option key={s.id} value={s.id}>{s.name}</option>
+            ))}
+          </select>
+          <select
+            value=""
+            onChange={(e) => handleLoadSet(2, e.target.value)}
+            className="px-2 py-1 text-sm bg-slate-700 text-white rounded border border-slate-600 focus:border-amber-500 focus:outline-none"
+          >
+            <option value="" disabled>💾 Cargar set guardado → Config 2</option>
+            {savedSets.map((s) => (
+              <option key={s.id} value={s.id}>{s.name}</option>
+            ))}
+          </select>
+        </div>
+      ) : (
+        <p className="text-xs text-slate-400 mb-2">
+          💡 Guarda sets desde la pestaña Calculadora para compararlos aquí.
+        </p>
+      )}
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 flex-1 lg:overflow-hidden">
         {/* Config 1 */}
         <Card title="CONFIG 1" icon="🔴">
           {config1 ? (

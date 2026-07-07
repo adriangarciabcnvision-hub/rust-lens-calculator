@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { CalculatorTab } from '@/components/tabs/CalculatorTab';
 import { DiagnosticsTab } from '@/components/tabs/DiagnosticsTab';
 import { DepthOfFieldTab } from '@/components/tabs/DepthOfFieldTab';
@@ -9,6 +9,8 @@ import { FrameRateTab } from '@/components/tabs/FrameRateTab';
 import { ComparatorTab } from '@/components/tabs/ComparatorTab';
 import { CodeReadabilityTab } from '@/components/tabs/CodeReadabilityTab';
 import { AdminTab } from '@/components/tabs/AdminTab';
+import { HelpModal } from '@/components/HelpModal';
+import { useDataStore } from '@/lib/dataStore';
 
 const TABS = [
   { id: 'calculator', label: '📊 Calculadora', component: CalculatorTab },
@@ -23,27 +25,34 @@ const TABS = [
 
 export default function AppPage() {
   const [activeTab, setActiveTab] = useState('calculator');
+  const [showHelp, setShowHelp] = useState(false);
+
+  // Si hay Supabase configurado, carga el catálogo compartido al arrancar
+  useEffect(() => {
+    useDataStore.getState().syncFromCloud();
+  }, []);
 
   const ActiveComponent = TABS.find((tab) => tab.id === activeTab)?.component || CalculatorTab;
 
   return (
-    <main className="h-screen bg-gradient-to-br from-slate-900 to-slate-800 flex flex-col overflow-hidden">
+    <main className="h-dvh bg-gradient-to-br from-slate-900 to-slate-800 flex flex-col overflow-hidden">
       {/* Header - Compacto */}
       <div className="bg-gradient-to-r from-slate-800 to-slate-900 border-b border-slate-700 flex-shrink-0">
         <div className="px-4 py-2">
           <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-3 flex-1">
-              <div className="text-2xl font-bold">
-                <span className="bg-gradient-to-br from-amber-400 to-orange-500 bg-clip-text text-transparent">⚙️</span>
-              </div>
-              <div>
-                <h1 className="text-xl font-bold text-amber-400">RUST Lens Calculator</h1>
-                <p className="text-xs text-slate-400">Professional Optical Calculations</p>
+            <div className="flex items-center gap-3 flex-1 min-w-0">
+              <img src="/logo.png" alt="EQUIPO RUST" className="h-9 w-9 sm:h-11 sm:w-11 flex-shrink-0" />
+              <div className="min-w-0">
+                <h1 className="text-base sm:text-xl font-bold text-amber-400 truncate">EQUIPO RUST · Lens Calculator</h1>
+                <p className="text-xs text-slate-400 hidden sm:block">Professional Optical Calculations</p>
               </div>
             </div>
-            <div className="text-right flex items-center gap-3">
-              <span className="text-xs text-slate-400">v2.0.0</span>
-              <button className="px-3 py-1 bg-slate-700 hover:bg-slate-600 text-white rounded text-xs transition">
+            <div className="text-right flex items-center gap-3 flex-shrink-0">
+              <span className="text-xs text-slate-400 hidden sm:inline">v2.0.0</span>
+              <button
+                onClick={() => setShowHelp(true)}
+                className="px-3 py-1 bg-slate-700 hover:bg-slate-600 text-white rounded text-xs transition"
+              >
                 ? Ayuda
               </button>
             </div>
@@ -69,11 +78,13 @@ export default function AppPage() {
       </div>
 
       {/* Content - Sin scroll */}
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden">
         <div className="px-4 py-3 h-full">
           <ActiveComponent />
         </div>
       </div>
+
+      {showHelp && <HelpModal onClose={() => setShowHelp(false)} />}
     </main>
   );
 }
