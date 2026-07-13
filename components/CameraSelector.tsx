@@ -253,6 +253,18 @@ if (
 
       <div className="max-h-[600px] overflow-y-auto space-y-2">
 
+        <button
+          onClick={() => onChange('')}
+          className={`w-full rounded-lg border p-3 text-left transition ${
+            value === ''
+              ? 'border-amber-500 bg-amber-500/10'
+              : 'border-dashed border-slate-600 bg-slate-800 hover:border-amber-600 hover:bg-slate-700'
+          }`}
+        >
+          <span className="font-bold text-slate-300">✕ Sin cámara / Personalizada</span>
+          <p className="text-xs text-slate-400 mt-1">Introduce Píxel, Res H/V, Max FPS y Readout a mano</p>
+        </button>
+
         {filtered.length === 0 && (
 
           <div className="text-center text-slate-400 text-sm py-8">

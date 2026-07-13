@@ -22,12 +22,23 @@ import {
 
 
 
+// Tabla estándar de formatos ópticos (convención "tipo tubo vidicon"), valores en mm
+// tal y como los publican Sony/Basler/FLIR/Edmund Optics en sus tablas de formato de sensor.
 const SENSOR_FORMATS = {
+  '1/4"': [3.2, 2.4],
+  '1/3.6"': [4.0, 3.0],
+  '1/3.2"': [4.54, 3.42],
   '1/3"': [4.8, 3.6],
-  '1/2.3"': [6.4, 4.8],
-  '2/3"': [9.6, 7.2],
+  '1/2.7"': [5.37, 4.04],
+  '1/2.5"': [5.76, 4.29],
+  '1/2.3"': [6.16, 4.62],
+  '1/2"': [6.4, 4.8],
+  '1/1.8"': [7.18, 5.32],
+  '1/1.7"': [7.6, 5.7],
+  '2/3"': [8.8, 6.6],
   '1"': [12.8, 9.6],
-  'APS-C': [23.6, 15.7],
+  '4/3"': [17.3, 13.0],
+  'APS-C': [23.6, 15.6],
   'Full Frame': [36, 24],
 };
 
@@ -35,6 +46,10 @@ const SENSOR_FORMATS = {
 // vidicon): 1/3" son siempre 4.8×3.6mm sea cual sea la resolución. Por eso se detecta
 // comparando el Ancho/Alto YA CALCULADO (Res × Píxel) contra estos tamaños estándar,
 // no a partir de la resolución sola.
+// OJO: esta tabla asume sensores ~4:3, la relación de aspecto clásica de los tubos vidicon.
+// Muchos sensores modernos de visión artificial (16:10, 16:9, 1:1...) no coinciden con
+// NINGÚN formato estándar aunque su tamaño sea perfectamente normal — no es un fallo del
+// cálculo, es que ese sensor concreto no tiene una designación "en pulgadas" que le encaje.
 function detectSensorFormat(widthMm: number, heightMm: number): string {
   if (widthMm <= 0 || heightMm <= 0) return '';
   const match = Object.entries(SENSOR_FORMATS).find(
@@ -42,6 +57,8 @@ function detectSensorFormat(widthMm: number, heightMm: number): string {
   );
   return match ? match[0] : '';
 }
+
+const CUSTOM_FORMAT_VALUE = '__custom__';
 
 export function CalculatorTab() {
   const store = useCalculatorStore();
@@ -54,7 +71,7 @@ export function CalculatorTab() {
   const [setName, setSetName] = useState('');
   const [selectedCameraId, setSelectedCameraId] = useState('');
   const [selectedLensId, setSelectedLensId] = useState('');
-  const [showRequestDialog, setShowRequestDialog] = useState(false);
+  const [requestDialogType, setRequestDialogType] = useState<'camera' | 'lens' | null>(null);
   const [diagnosticMsg, setDiagnosticMsg] = useState('');
   const [activeDepKey, setActiveDepKey] = useState<string | null>(null);
 const [cameraDialog,setCameraDialog]=useState(false);
@@ -81,6 +98,11 @@ const [lensDialog,setLensDialog]=useState(false);
   const isWorkingDistanceTarget = calculationTarget === 'workingDistance';
   const isFocalLengthTarget = calculationTarget === 'focalLength';
 
+  // Con una cámara/lente del catálogo seleccionada, sus campos propios quedan bloqueados
+  // (para editarlos hay que elegir primero "Sin cámara/lente" en el selector)
+  const isCameraLocked = !!selectedCameraId;
+  const isLensLocked = !!selectedLensId;
+
   // ===== Resaltado de dependencias: clic en el título de un parámetro muestra de qué depende =====
   const dependencyMap: Record<string, string[]> = {
     sensorWidth: ['resolutionH', 'pixelSize'],
@@ -96,7 +118,9 @@ const [lensDialog,setLensDialog]=useState(false);
         ? ['workingDistance', 'desiredFovX', 'sensorWidth']
         : ['focalLength', 'workingDistance'],
     maxFps: ['maxFps'],
-    motionBlur: ['velocity', 'exposure', 'pixelSize'],
+    // El blur se mide en mm/pixel SOBRE EL OBJETO (incorpora la magnificación), no en el
+    // píxel físico del sensor — depende de todo el triángulo óptico, no solo del píxel
+    motionBlur: ['velocity', 'exposure', 'sensorWidth', 'focalLength', 'workingDistance', 'resolutionH'],
     dof: ['focalLength', 'workingDistance', 'fNumber', 'circleOfConfusion', 'minimumFocusDistance'],
   };
   const handleLabelClick = (key: string) => setActiveDepKey((prev) => (prev === key ? null : key));
@@ -129,7 +153,11 @@ const [lensDialog,setLensDialog]=useState(false);
   const handleSelectCamera = (id: string) => {
     setSelectedCameraId(id);
     const cam = dataStore.cameras.find((c) => c.id === id);
-    if (!cam) return;
+    if (!cam) {
+      // "Sin cámara / Personalizada": libera los campos para editarlos a mano
+      store.setCamera(null);
+      return;
+    }
     // Las cámaras del catálogo hoy son todas matriciales (área)
     setCameraKind('matricial');
     store.setSensorWidth(cam.sensorWidth);
@@ -143,16 +171,23 @@ const [lensDialog,setLensDialog]=useState(false);
     store.setCamera({ display_name: cam.name } as any);
   };
 
-  // Editar un campo que normalmente viene de la cámara deselecciona el desplegable,
-  // para que quede claro que ya no corresponde exactamente a ese modelo del catálogo
+  // Ya no hace falta al editar (esos campos quedan disabled mientras haya cámara elegida),
+  // pero se deja como red de seguridad por si algún campo se edita por otra vía
   const deselectCamera = () => {
-    if (selectedCameraId) setSelectedCameraId('');
+    if (selectedCameraId) {
+      setSelectedCameraId('');
+      store.setCamera(null);
+    }
   };
 
   const handleSelectLens = (id: string) => {
     setSelectedLensId(id);
     const lens = dataStore.lenses.find((l) => l.id === id);
-    if (!lens) return;
+    if (!lens) {
+      // "Sin lente / Personalizado": libera Focal Length para editarlo a mano
+      store.setLens(null);
+      return;
+    }
     store.setFocalLength(lens.focalLength);
     store.setLens({ display_name: lens.name } as any);
   };
@@ -168,6 +203,8 @@ const [lensDialog,setLensDialog]=useState(false);
 
   const handleSensorFormatChange = (format: string | number) => {
     const formatStr = String(format);
+    // Opción sintética "Personalizado (WxH)": solo informativa, no un preset real que aplicar
+    if (formatStr === CUSTOM_FORMAT_VALUE) return;
     setSensorFormat(formatStr);
     if (formatStr !== '') {
       const [width, height] = SENSOR_FORMATS[formatStr as keyof typeof SENSOR_FORMATS] || [0, 0];
@@ -188,41 +225,31 @@ const [lensDialog,setLensDialog]=useState(false);
   // ===== CÁLCULO EN VIVO (sin botón): un efecto por modo, cada uno solo activo en su modo =====
 
   // Motion Blur: puramente derivado, sin necesidad de escribir en el store (pero sí se
-  // incluye en store.results para que Comparador y el historial lo tengan disponible)
-const motionBlur =
-useMemo(()=>{
-
-const fovHorizontal =
-(store.sensorWidth / store.focalLength)
-* store.workingDistance;
-
-const mmPerPixel =
-store.results?.spatialResolution ??
-(
-    ((store.sensorWidth/store.focalLength)
-    *store.workingDistance)
-    /store.resolution_h
-);
+  // incluye en store.results para que Comparador y el historial lo tengan disponible).
+  // mmPerPixel es la resolución espacial sobre el OBJETO (no el píxel físico del sensor:
+  // incorpora la magnificación), así que necesita focal/WD/resolución ya calculados — si
+  // falta alguno, debe dar 0 (no Infinity/NaN) para que calculateMotionBlur lo marque
+  // limpiamente como "no calculable" en vez de un resultado falso o "NaN px".
+  const motionBlur = useMemo(() => {
+    const mmPerPixel =
+      store.results?.spatialResolution ??
+      (store.focalLength > 0 && store.resolution_h > 0
+        ? ((store.sensorWidth / store.focalLength) * store.workingDistance) / store.resolution_h
+        : 0);
     return calculateMotionBlur({
-
-        velocityMmPerSec:
-        store.velocity,
-
-        exposureMs:
-        store.exposure,
-
-        mmPerPixel
-
+      velocityMmPerSec: store.velocity,
+      exposureMs: store.exposure,
+      mmPerPixel,
     });
-
-},[
+  }, [
     store.velocity,
     store.exposure,
     store.sensorWidth,
     store.focalLength,
     store.workingDistance,
-    store.resolution_h
-]);
+    store.resolution_h,
+    store.results?.spatialResolution,
+  ]);
 
   useEffect(() => {
     if (!isFieldOfViewTarget) return;
@@ -603,23 +630,17 @@ return (
                   {/* SENSOR SECTION */}
                   <Card title="Sensor" icon="📊" className="p-2">
                     <div className="flex gap-2 mb-2">
-                    <div className="flex gap-2">
-
               <button
                   onClick={()=>setCameraDialog(true)}
                   className="flex-1 bg-slate-700 hover:bg-slate-600 rounded px-3 py-2 text-left"
               >
-
                   {store.camera?.display_name
                       ? `📷 ${store.camera.display_name}`
                       : 'Seleccionar cámara'}
-
               </button>
-
-          </div>
             <button
-              onClick={() => setShowRequestDialog(true)}
-              title="Solicitar añadir una cámara o lente al catálogo"
+              onClick={() => setRequestDialogType('camera')}
+              title="Solicitar añadir una cámara al catálogo"
               className="px-2 py-1 bg-slate-700 hover:bg-amber-600 text-white rounded text-xs transition flex-shrink-0"
             >
               ➕ Solicitar
@@ -629,10 +650,15 @@ return (
             <FormInput
               label="Formato"
               type="select"
-              value={sensorFormat}
+              value={sensorFormat === '' && store.sensorWidth > 0 && store.sensorHeight > 0 ? CUSTOM_FORMAT_VALUE : sensorFormat}
               onChange={handleSensorFormatChange}
-              options={Object.keys(SENSOR_FORMATS).map((k) => ({ value: k, label: k }))}
-              tooltip="Se detecta solo a partir de Res H/Res V/Píxel (compara el Ancho/Alto calculado con los tamaños físicos estándar). También puedes elegirlo a mano como atajo"
+              options={[
+                ...Object.keys(SENSOR_FORMATS).map((k) => ({ value: k, label: k })),
+                ...(sensorFormat === '' && store.sensorWidth > 0 && store.sensorHeight > 0
+                  ? [{ value: CUSTOM_FORMAT_VALUE, label: `Personalizado (${store.sensorWidth.toFixed(2)}×${store.sensorHeight.toFixed(2)}mm)` }]
+                  : []),
+              ]}
+              tooltip="Se detecta solo a partir de Res H/Res V/Píxel (compara el Ancho/Alto calculado con los tamaños físicos estándar). Si no coincide con ninguno, muestra el tamaño real — muchos sensores modernos no son 4:3 y no tienen una designación en pulgadas exacta"
             />
             <FormInput
               label="Ancho"
@@ -669,7 +695,8 @@ return (
               unit="µm"
               step="0.1"
               min={0.1}
-              tooltip="Tamaño de cada píxel. Recalcula Ancho y Alto automáticamente"
+              disabled={isCameraLocked}
+              tooltip={isCameraLocked ? '❌ Viene de la cámara seleccionada — elige "Sin cámara" para editarlo' : 'Tamaño de cada píxel. Recalcula Ancho y Alto automáticamente'}
               highlighted={isHighlighted('pixelSize')}
             />
             <FormInput
@@ -684,7 +711,8 @@ return (
               }}
               unit="px"
               min={1}
-              tooltip="Resolución horizontal. Junto al Píxel, calcula el Ancho del sensor automáticamente"
+              disabled={isCameraLocked}
+              tooltip={isCameraLocked ? '❌ Viene de la cámara seleccionada — elige "Sin cámara" para editarlo' : 'Resolución horizontal. Junto al Píxel, calcula el Ancho del sensor automáticamente'}
               highlighted={isHighlighted('resolutionH')}
             />
             <FormInput
@@ -699,7 +727,8 @@ return (
               }}
               unit="px"
               min={1}
-              tooltip="Resolución vertical. Junto al Píxel, calcula el Alto del sensor automáticamente"
+              disabled={isCameraLocked}
+              tooltip={isCameraLocked ? '❌ Viene de la cámara seleccionada — elige "Sin cámara" para editarlo' : 'Resolución vertical. Junto al Píxel, calcula el Alto del sensor automáticamente'}
               highlighted={isHighlighted('resolutionV')}
             />
           </div>
@@ -737,12 +766,15 @@ return (
               label="Focal Length"
               type="number"
               value={store.focalLength}
-              onChange={(v) => store.setFocalLength(typeof v === 'string' ? parseFloat(v) : v)}
+              onChange={(v) => {
+                if (selectedLensId) { setSelectedLensId(''); store.setLens(null); }
+                store.setFocalLength(typeof v === 'string' ? parseFloat(v) : v);
+              }}
               unit="mm"
               step="0.1"
               min={0.1}
-              disabled={isFocalLengthTarget}
-              tooltip={isFocalLengthTarget ? '❌ Se calcula automáticamente' : 'Distancia focal del lente en mm'}
+              disabled={isFocalLengthTarget || isLensLocked}
+              tooltip={isFocalLengthTarget ? '❌ Se calcula automáticamente' : isLensLocked ? '❌ Viene del lente seleccionado — elige "Sin lente" para editarlo' : 'Distancia focal del lente en mm'}
               onLabelClick={isFocalLengthTarget ? () => handleLabelClick('focalLength') : undefined}
               highlighted={isHighlighted('focalLength')}
             />
@@ -802,14 +834,23 @@ return (
 
         {/* DEPTH OF FIELD */}
         <Card title="Profundidad de Campo (DOF)" icon="📐" className="p-2">
-        <button
-            onClick={() => setLensDialog(true)}
-            className="w-full bg-slate-700 hover:bg-slate-600 rounded px-3 py-2 text-left"
-        >
-            {store.lens?.display_name
-                ? `🔭 ${store.lens.display_name}`
-                : 'Seleccionar lente'}
-        </button>
+        <div className="flex gap-2 mb-2">
+          <button
+              onClick={() => setLensDialog(true)}
+              className="flex-1 bg-slate-700 hover:bg-slate-600 rounded px-3 py-2 text-left"
+          >
+              {store.lens?.display_name
+                  ? `🔭 ${store.lens.display_name}`
+                  : 'Seleccionar lente'}
+          </button>
+          <button
+            onClick={() => setRequestDialogType('lens')}
+            title="Solicitar añadir un lente al catálogo"
+            className="px-2 py-1 bg-slate-700 hover:bg-amber-600 text-white rounded text-xs transition flex-shrink-0"
+          >
+            ➕ Solicitar
+          </button>
+        </div>
           <div className="grid grid-cols-2 gap-2">
             <FormInput
               label="Número f"
@@ -891,7 +932,8 @@ return (
                   unit="fps"
                   step="1"
                   min={0.1}
-                  tooltip="FPS máximo de la cámara: imágenes completas por segundo. Recalcula el Readout por defecto (1000/MaxFPS)"
+                  disabled={isCameraLocked}
+                  tooltip={isCameraLocked ? '❌ Viene de la cámara seleccionada — elige "Sin cámara" para editarlo' : 'FPS máximo de la cámara: imágenes completas por segundo. Recalcula el Readout por defecto (1000/MaxFPS)'}
                   highlighted={isHighlighted('maxFps')}
                 />
               </div>
@@ -932,7 +974,8 @@ return (
                 unit="ms"
                 step="0.1"
                 min={0}
-                tooltip="Tiempo de lectura del sensor. Se rellena solo al elegir cámara del catálogo, o se estima como 1000/MaxFPS — sobrescríbelo si tienes un dato más preciso del datasheet"
+                disabled={isCameraLocked}
+                tooltip={isCameraLocked ? '❌ Viene de la cámara seleccionada — elige "Sin cámara" para editarlo' : 'Tiempo de lectura del sensor. Se rellena solo al elegir cámara del catálogo, o se estima como 1000/MaxFPS — sobrescríbelo si tienes un dato más preciso del datasheet'}
               />
             </div>
           </div>
@@ -1003,26 +1046,36 @@ return (
             <p className="text-xs text-red-400 mt-2">⚠️ El FPS deseado ({fpsFieldValue.toFixed(1)}) supera el máximo de la cámara ({store.maxFps.toFixed(1)})</p>
           )}
 
-          {motionBlur.success && (
-            <div className="mt-2 space-y-2">
-              <div className={`p-2 rounded text-xs flex justify-between items-center ${
-                motionBlur.qualityIndicator === 'excellent' ? 'bg-green-900/30 border border-green-700' :
-                motionBlur.qualityIndicator === 'very_good' ? 'bg-lime-900/30 border border-lime-700' :
-                motionBlur.qualityIndicator === 'good' ? 'bg-teal-900/30 border border-teal-700' :
-                motionBlur.qualityIndicator === 'acceptable' ? 'bg-amber-900/30 border border-amber-700' :
-                motionBlur.qualityIndicator === 'degraded' ? 'bg-orange-900/30 border border-orange-700' :
-                'bg-red-900/30 border border-red-700'
-              }`}>
-                <span className="text-slate-300">Motion Blur: <span className="font-bold text-white">{motionBlur.blurPixels?.toFixed(2)} px</span></span>
-                <span className="text-slate-300">{motionBlur.qualityIndicator ? MOTION_BLUR_QUALITY_LABELS[motionBlur.qualityIndicator] : ''}</span>
-              </div>
-              {inspectionCheck !== null && (
-                <p className={`text-xs ${inspectionCheck ? 'text-green-400' : 'text-red-400'}`}>
-                  {inspectionCheck ? '✅' : '⚠️'} {inspectionCheck ? 'Adecuado' : 'Motion blur alto'} para {INSPECTION_TYPE_LABELS[inspectionType].toLowerCase()}
-                </p>
-              )}
+          <div className="mt-2 space-y-2">
+            <div className={`p-2 rounded text-xs flex justify-between items-center ${isHighlighted('motionBlur') ? 'ring-2 ring-amber-400' : ''} ${
+              !motionBlur.success ? 'bg-slate-700 border border-slate-600' :
+              motionBlur.qualityIndicator === 'excellent' ? 'bg-green-900/30 border border-green-700' :
+              motionBlur.qualityIndicator === 'very_good' ? 'bg-lime-900/30 border border-lime-700' :
+              motionBlur.qualityIndicator === 'good' ? 'bg-teal-900/30 border border-teal-700' :
+              motionBlur.qualityIndicator === 'acceptable' ? 'bg-amber-900/30 border border-amber-700' :
+              motionBlur.qualityIndicator === 'degraded' ? 'bg-orange-900/30 border border-orange-700' :
+              'bg-red-900/30 border border-red-700'
+            }`}>
+              <button
+                type="button"
+                onClick={() => handleLabelClick('motionBlur')}
+                className="text-slate-300 hover:text-amber-300 underline decoration-dotted underline-offset-2 text-left"
+                title="Ver qué parámetros hacen falta para calcularlo"
+              >
+                Motion Blur: <span className="font-bold text-white">{motionBlur.success ? `${motionBlur.blurPixels?.toFixed(2)} px` : '—'}</span>
+              </button>
+              <span className="text-slate-300">
+                {motionBlur.success
+                  ? (motionBlur.qualityIndicator ? MOTION_BLUR_QUALITY_LABELS[motionBlur.qualityIndicator] : '')
+                  : 'Faltan datos (pincha para ver cuáles)'}
+              </span>
             </div>
-          )}
+            {motionBlur.success && inspectionCheck !== null && (
+              <p className={`text-xs ${inspectionCheck ? 'text-green-400' : 'text-red-400'}`}>
+                {inspectionCheck ? '✅' : '⚠️'} {inspectionCheck ? 'Adecuado' : 'Motion blur alto'} para {INSPECTION_TYPE_LABELS[inspectionType].toLowerCase()}
+              </p>
+            )}
+          </div>
         </Card>
       </div>
 
@@ -1213,7 +1266,7 @@ return (
         </div>
       </div>
 
-      {showRequestDialog && <RequestDialog onClose={() => setShowRequestDialog(false)} />}
+      {requestDialogType && <RequestDialog initialType={requestDialogType} onClose={() => setRequestDialogType(null)} />}
     </div>
     </div>
 

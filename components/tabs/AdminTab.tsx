@@ -331,14 +331,27 @@ const handleImportCameras = async (file: File | undefined) => {
     if (!file) return;
     try {
       const rows = await readSheet(file);
-      const lenses: Omit<StoredLens, 'id'>[] = rows.map((r: any) => ({
-        name: String(pick(r, 'Nombre', 'Name', 'name') ?? ''),
-        focalLength: num(pick(r, 'Focal_mm', 'FocalLength', 'focalLength', 'Focal')),
-        aperture: pick(r, 'Apertura', 'Aperture', 'aperture') ? String(pick(r, 'Apertura', 'Aperture', 'aperture')) : undefined,
-      }));
+      const lenses: Omit<StoredLens, 'id'>[] = rows.map((r: any) => {
+        const manufacturer = pick(r, 'Manufacturer', 'manufacturer', 'Fabricante');
+        const model = pick(r, 'Model', 'model', 'Modelo');
+        const telecentric = pick(r, 'Telecentric', 'telecentric', 'Telecentrica');
+        return {
+          manufacturer: manufacturer !== undefined ? String(manufacturer) : undefined,
+          model: model !== undefined ? String(model) : undefined,
+          name: String(pick(r, 'Model', 'model', 'Nombre', 'Name', 'name') ?? ''),
+          focalLength: num(pick(r, 'Focal_mm', 'FocalLength', 'focalLength', 'Focal')),
+          aperture: pick(r, 'Aperture', 'Apertura', 'aperture') ? String(pick(r, 'Aperture', 'Apertura', 'aperture')) : undefined,
+          mount: pick(r, 'Mount', 'mount', 'Montura') ? String(pick(r, 'Mount', 'mount', 'Montura')) : undefined,
+          maxSensor: pick(r, 'MaxSensor', 'maxSensor', 'Max_Sensor') ? String(pick(r, 'MaxSensor', 'maxSensor', 'Max_Sensor')) : undefined,
+          telecentric: telecentric !== undefined ? String(telecentric) : undefined,
+          workingDistanceMin: pick(r, 'WD_Min', 'WorkingDistanceMin') ? num(pick(r, 'WD_Min', 'WorkingDistanceMin')) : undefined,
+          workingDistanceMax: pick(r, 'WD_Max', 'WorkingDistanceMax') ? num(pick(r, 'WD_Max', 'WorkingDistanceMax')) : undefined,
+        };
+      });
       const count = data.importLenses(lenses);
-      notify(count ? `✓ ${count} lentes importados` : '⚠️ Ninguna fila válida (revisa las columnas: Nombre, Focal_mm, Apertura)');
-    } catch {
+      notify(count ? `✓ ${count} lentes importados` : '⚠️ Ninguna fila válida (revisa las columnas: Manufacturer, Model, Focal_mm)');
+    } catch (e) {
+      console.error(e);
       notify('⚠️ No se pudo leer el archivo');
     }
     if (lensFileRef.current) lensFileRef.current.value = '';
@@ -617,8 +630,8 @@ Color. Ancho/Alto y Readout se calculan solos — no hace falta indicarlos (Read
               {data.lenses.map((l) => (
                 <div key={l.id} className="flex items-center justify-between bg-slate-700 px-2 py-1 rounded text-xs">
                   <span>
-                    <span className="font-semibold">{l.name}</span>
-                    <span className="text-slate-400"> · {l.focalLength}mm{l.aperture ? ` · ${l.aperture}` : ''}</span>
+                    <span className="font-semibold">{l.manufacturer ? `${l.manufacturer} ` : ''}{l.model ?? l.name}</span>
+                    <span className="text-slate-400"> · {l.focalLength}mm{l.aperture ? ` · ${l.aperture}` : ''}{l.mount ? ` · ${l.mount}` : ''}{l.maxSensor ? ` · ${l.maxSensor}` : ''}{l.telecentric ? ` · ${l.telecentric}` : ''}</span>
                   </span>
                   <button onClick={() => data.removeLens(l.id)} className="px-2 py-0.5 bg-red-700 hover:bg-red-600 text-white rounded">✕</button>
                 </div>
@@ -647,7 +660,7 @@ Color. Ancho/Alto y Readout se calculan solos — no hace falta indicarlos (Read
             className="hidden"
             onChange={(e) => handleImportLenses(e.target.files?.[0])}
           />
-          <p className="text-xs text-slate-400">Columnas: Nombre, Focal_mm, Apertura</p>
+          <p className="text-xs text-slate-400">Columnas: Manufacturer, Model, Focal_mm, Aperture, Mount, MaxSensor, Telecentric (todas menos Model y Focal_mm son opcionales)</p>
         </div>
       </Card>
 

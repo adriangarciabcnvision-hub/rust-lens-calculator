@@ -26,8 +26,8 @@ export interface StoredCamera {
   sensor?: string;
 
   interface?: string;
-  shutter?: 'Global' | 'Rolling';
-  color?: 'Mono' | 'Color';
+  shutter?: string;
+  color?: string;
 
   sensorWidth: number;
   sensorHeight: number;

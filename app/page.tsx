@@ -29,8 +29,6 @@ export default function AppPage() {
     useDataStore.getState().syncFromCloud();
   }, []);
 
-  const ActiveComponent = TABS.find((tab) => tab.id === activeTab)?.component || CalculatorTab;
-
   return (
     <main className="h-dvh bg-gradient-to-br from-slate-900 to-slate-800 flex flex-col overflow-hidden">
       {/* Header - Compacto */}
@@ -75,9 +73,20 @@ export default function AppPage() {
       </div>
 
       {/* Content - Sin scroll */}
+      {/* Todas las pestañas se quedan montadas (solo se ocultan con CSS): cambiar de
+          pestaña no debe borrar lo que el usuario ya había rellenado en otra (Motion
+          Blur, sensor/óptica, selección de cámara/lente, etc.) */}
       <div className="flex-1 overflow-y-auto overflow-x-hidden">
         <div className="px-4 py-3 h-full">
-          <ActiveComponent />
+          {TABS.map((tab) => {
+            const TabComponent = tab.component;
+            const isActive = activeTab === tab.id;
+            return (
+              <div key={tab.id} className={isActive ? 'h-full' : 'hidden'}>
+                {tab.id === 'optical' ? <OpticalDiagramTab isActive={isActive} /> : <TabComponent />}
+              </div>
+            );
+          })}
         </div>
       </div>
 

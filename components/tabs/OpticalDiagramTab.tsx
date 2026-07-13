@@ -15,7 +15,47 @@ const COLOR_SENSOR = 0x10b981; // green
 const COLOR_RAY = 0xec4899; // pink
 const COLOR_AXIS = 0x64748b; // slate
 
-export function OpticalDiagramTab() {
+// Etiqueta de texto flotante (sprite con textura de canvas): siempre mira a la cámara,
+// no se deforma con la perspectiva — para anotar distancias/parámetros sobre la escena.
+// `height` es un tamaño absoluto en unidades de escena (no en mm reales, la escena ya está
+// normalizada a un cubo de ~10 unidades vía depthScale/sizeScale) para que el texto sea
+// legible sea cual sea la escala física del montaje actual.
+function makeTextSprite(text: string, accentColor: string, height = 0.4): THREE.Sprite {
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d')!;
+  const fontSize = 42;
+  ctx.font = `600 ${fontSize}px Arial`;
+  const textWidth = ctx.measureText(text).width;
+  const padX = 18;
+  const padY = 12;
+  canvas.width = textWidth + padX * 2;
+  canvas.height = fontSize + padY * 2;
+
+  ctx.font = `600 ${fontSize}px Arial`;
+  ctx.fillStyle = 'rgba(10, 9, 7, 0.85)';
+  ctx.strokeStyle = accentColor;
+  ctx.lineWidth = 3;
+  const r = 10;
+  ctx.beginPath();
+  ctx.roundRect(1.5, 1.5, canvas.width - 3, canvas.height - 3, r);
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.fillStyle = accentColor;
+  ctx.textBaseline = 'middle';
+  ctx.textAlign = 'center';
+  ctx.fillText(text, canvas.width / 2, canvas.height / 2 + 2);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.minFilter = THREE.LinearFilter;
+  const material = new THREE.SpriteMaterial({ map: texture, transparent: true, depthTest: false, sizeAttenuation: true });
+  const sprite = new THREE.Sprite(material);
+  const aspect = canvas.width / canvas.height;
+  sprite.scale.set(height * aspect, height, 1);
+  return sprite;
+}
+
+export function OpticalDiagramTab({ isActive = true }: { isActive?: boolean } = {}) {
   const store = useCalculatorStore();
   const mountRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
@@ -24,6 +64,7 @@ export function OpticalDiagramTab() {
   const controlsRef = useRef<OrbitControls | null>(null);
   const contentGroupRef = useRef<THREE.Group | null>(null);
   const frameIdRef = useRef<number>(0);
+  const resizeRef = useRef<(() => void) | null>(null);
   const [hasScene, setHasScene] = useState(false);
 
   // El FOV siempre es derivable de los parámetros actuales; si hay un cálculo previo se usa ese
@@ -51,13 +92,17 @@ export function OpticalDiagramTab() {
     scene.background = new THREE.Color(COLOR_BG);
     sceneRef.current = scene;
 
-    const camera = new THREE.PerspectiveCamera(45, mount.clientWidth / mount.clientHeight, 0.1, 1000);
+    // Si la pestaña arranca oculta (mount 0×0, montada en background para no perder estado
+    // al cambiar de pestaña), usa un aspect ratio provisional razonable — el efecto de
+    // "isActive" de más abajo corrige tamaño/aspect en cuanto la pestaña se hace visible.
+    const initialAspect = mount.clientWidth > 0 && mount.clientHeight > 0 ? mount.clientWidth / mount.clientHeight : 16 / 9;
+    const camera = new THREE.PerspectiveCamera(45, initialAspect, 0.1, 1000);
     camera.position.set(7, 4, 9);
     cameraRef.current = camera;
 
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    renderer.setSize(mount.clientWidth, mount.clientHeight);
+    renderer.setSize(mount.clientWidth || 1, mount.clientHeight || 1);
     mount.appendChild(renderer.domElement);
     rendererRef.current = renderer;
 
@@ -83,18 +128,26 @@ export function OpticalDiagramTab() {
 
     const animate = () => {
       frameIdRef.current = requestAnimationFrame(animate);
+      // La pestaña se queda montada (oculta con CSS) al cambiar de pestaña, para no perder
+      // el estado de las demás — mientras esté oculta el contenedor mide 0×0, así que se
+      // salta el render (GPU) pero se sigue pidiendo el siguiente frame para reengancharse
+      // solo en cuanto vuelva a ser visible
+      if (mount.clientWidth === 0 || mount.clientHeight === 0) return;
       controls.update();
       renderer.render(scene, camera);
     };
     animate();
 
-    const resizeObserver = new ResizeObserver(() => {
-      if (!mount) return;
+    const doResize = () => {
+      if (!mount || mount.clientWidth === 0 || mount.clientHeight === 0) return;
       camera.aspect = mount.clientWidth / mount.clientHeight;
       camera.updateProjectionMatrix();
       renderer.setSize(mount.clientWidth, mount.clientHeight);
       renderer.render(scene, camera);
-    });
+    };
+    resizeRef.current = doResize;
+
+    const resizeObserver = new ResizeObserver(doResize);
     resizeObserver.observe(mount);
 
     return () => {
@@ -105,6 +158,15 @@ export function OpticalDiagramTab() {
       if (renderer.domElement.parentElement === mount) mount.removeChild(renderer.domElement);
     };
   }, []);
+
+  // La pestaña se queda montada en background al cambiar de pestaña (para no perder el
+  // estado). El renderer se crea con el tamaño que tuviera el contenedor en ese momento —
+  // si arrancó oculto (0×0), o si Chrome no dispara el ResizeObserver de forma fiable al
+  // pasar de display:none a visible, el canvas se queda con tamaño incorrecto. Forzarlo
+  // explícitamente en cuanto la pestaña se activa corrige esto sin depender de ese evento.
+  useEffect(() => {
+    if (isActive) resizeRef.current?.();
+  }, [isActive]);
 
   // ===== Reconstrucción del contenido de la escena en cada cambio de parámetros =====
   useEffect(() => {
@@ -121,6 +183,9 @@ export function OpticalDiagramTab() {
           child.geometry.dispose();
           const mats = Array.isArray(child.material) ? child.material : [child.material];
           mats.forEach((m) => m.dispose());
+        } else if (child instanceof THREE.Sprite) {
+          child.material.map?.dispose();
+          child.material.dispose();
         }
       });
     }
@@ -223,14 +288,37 @@ export function OpticalDiagramTab() {
       group.add(ray);
     });
 
+    // --- Etiquetas de texto: distancias y parámetros anotados directamente sobre la escena ---
+    const wdLabel = makeTextSprite(`WD: ${store.workingDistance.toFixed(1)} mm`, '#fbbf24');
+    wdLabel.position.set(0, 0.35, (lensZ + objectZ) / 2);
+    group.add(wdLabel);
+
+    const focalLabel = makeTextSprite(`f: ${store.focalLength.toFixed(1)} mm`, '#3b82f6');
+    focalLabel.position.set(0, 0.35, (sensorZ + lensZ) / 2);
+    group.add(focalLabel);
+
+    const sensorLabel = makeTextSprite(`Sensor: ${store.sensorWidth.toFixed(1)}×${store.sensorHeight.toFixed(1)} mm`, '#10b981');
+    sensorLabel.position.set(0, -(sensorHalfH + 0.35), sensorZ);
+    group.add(sensorLabel);
+
+    const fovLabel = makeTextSprite(`FOV: ${fovH.toFixed(1)}×${fovV.toFixed(1)} mm`, '#fbbf24');
+    fovLabel.position.set(0, objHalfH + 0.35, objectZ);
+    group.add(fovLabel);
+
+    const magLabel = makeTextSprite(`×${results.magnification.toFixed(3)}`, '#93c5fd');
+    magLabel.position.set(lensRadius + 0.35, 0, lensZ);
+    group.add(magLabel);
+
     // Encuadre inicial de cámara centrado en el montaje, sin resetear si el usuario ya interactuó mucho
     const midZ = (sensorZ + objectZ) / 2;
     controls.target.set(0, 0, midZ);
     camera.position.set(Math.max(objHalfW, 3) * 1.4, Math.max(objHalfH, 2) * 1.6, midZ + totalDepth * depthScale * 0.7 + 3);
     controls.update();
     // Render inmediato además del bucle de animación, para que el cambio se vea al instante
-    // aunque el rAF esté retrasado (pestañas en segundo plano, etc.)
-    rendererRef.current?.render(sceneRef.current!, camera);
+    // aunque el rAF esté retrasado (pestañas en segundo plano, etc.) — salvo que esté oculta
+    // (0×0: la pestaña sigue montada en background para no perder su estado al cambiar de pestaña)
+    const mountEl = mountRef.current;
+    if (mountEl && mountEl.clientWidth > 0 && mountEl.clientHeight > 0) rendererRef.current?.render(sceneRef.current!, camera);
   }, [canRender, store.sensorWidth, store.sensorHeight, store.focalLength, store.workingDistance, results.fovHorizontalMm, results.fovVerticalMm]);
 
   return (

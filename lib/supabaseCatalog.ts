@@ -72,7 +72,18 @@ export async function fetchCatalog(): Promise<{ cameras: StoredCamera[]; lenses:
       : undefined,
 })),
     lenses: lens.data.map((l: any) => ({
-      id: l.id, name: l.name, focalLength: Number(l.focal_length), aperture: l.aperture || undefined,
+      id: l.id,
+      manufacturer: l.manufacturer ?? undefined,
+      model: l.model ?? undefined,
+      name: l.model ?? l.name,
+      focalLength: Number(l.focal_length),
+      aperture: l.aperture || undefined,
+      mount: l.mount ?? undefined,
+      maxSensor: l.max_sensor ?? undefined,
+      telecentric: l.telecentric ?? undefined,
+      workingDistanceMin: l.working_distance_min != null ? Number(l.working_distance_min) : undefined,
+      workingDistanceMax: l.working_distance_max != null ? Number(l.working_distance_max) : undefined,
+      sourceUrl: l.source_url ?? undefined,
     })),
     requests: reqs.data.map((r: any) => ({
       id: r.id, type: r.type, requestedBy: r.requested_by, status: r.status,
@@ -121,7 +132,20 @@ export async function upsertLenses(lenses: StoredLens[]) {
   const supabase = await getClient();
   if (!supabase) return;
   const { error } = await supabase.from('lenses').upsert(
-    lenses.map((l) => ({ id: l.id, name: l.name, focal_length: l.focalLength, aperture: l.aperture || null })),
+    lenses.map((l) => ({
+      id: l.id,
+      manufacturer: l.manufacturer,
+      model: l.model,
+      name: l.name,
+      focal_length: l.focalLength,
+      aperture: l.aperture || null,
+      mount: l.mount,
+      max_sensor: l.maxSensor,
+      telecentric: l.telecentric,
+      working_distance_min: l.workingDistanceMin,
+      working_distance_max: l.workingDistanceMax,
+      source_url: l.sourceUrl,
+    })),
     { onConflict: 'name' }
   );
   if (error) throw new Error(error.message);

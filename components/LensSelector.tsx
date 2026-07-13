@@ -19,6 +19,7 @@ export default function LensSelector({
   const { lenses } = useDataStore();
 
   const [search, setSearch] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
 
   const [filters, setFilters] = useState({
     manufacturer: '',
@@ -148,39 +149,73 @@ export default function LensSelector({
         className="w-full px-3 py-2 rounded bg-slate-700 border border-slate-600 text-white"
       />
 
-      <FilterChips
-        title="Fabricante"
-        values={manufacturers}
-        selected={filters.manufacturer}
-        onChange={(v) => updateFilter('manufacturer', v)}
-      />
+      <div className="flex items-center justify-between">
+        <button
+          onClick={() => setShowFilters(!showFilters)}
+          className="text-sm text-amber-400 hover:text-amber-300"
+        >
+          {showFilters ? '▲ Ocultar filtros' : '▼ Filtros avanzados'}
+        </button>
 
-      <FilterChips
-        title="Montura"
-        values={mounts}
-        selected={filters.mount}
-        onChange={(v) => updateFilter('mount', v)}
-      />
+        {showFilters && (
+          <button
+            onClick={() => setFilters({ manufacturer: '', mount: '', sensor: '', telecentric: '' })}
+            className="text-xs text-red-400 hover:text-red-300"
+          >
+            Limpiar filtros
+          </button>
+        )}
+      </div>
 
-      <FilterChips
-        title="Sensor"
-        values={sensors}
-        selected={filters.sensor}
-        onChange={(v) => updateFilter('sensor', v)}
-      />
+      {showFilters && (
+        <div className="space-y-3">
+          <FilterChips
+            title="Fabricante"
+            values={manufacturers}
+            selected={filters.manufacturer}
+            onChange={(v) => updateFilter('manufacturer', v)}
+          />
 
-      <FilterChips
-        title="Telecéntrica"
-        values={telecentrics}
-        selected={filters.telecentric}
-        onChange={(v) => updateFilter('telecentric', v)}
-      />
+          <FilterChips
+            title="Montura"
+            values={mounts}
+            selected={filters.mount}
+            onChange={(v) => updateFilter('mount', v)}
+          />
+
+          <FilterChips
+            title="Sensor"
+            values={sensors}
+            selected={filters.sensor}
+            onChange={(v) => updateFilter('sensor', v)}
+          />
+
+          <FilterChips
+            title="Telecéntrica"
+            values={telecentrics}
+            selected={filters.telecentric}
+            onChange={(v) => updateFilter('telecentric', v)}
+          />
+        </div>
+      )}
 
       <div className="text-xs text-slate-400">
         {filtered.length} lente{filtered.length !== 1 ? 's' : ''}
       </div>
 
       <div className="max-h-[600px] overflow-y-auto space-y-2">
+
+        <button
+          onClick={() => onChange('')}
+          className={`w-full rounded-lg border p-3 text-left transition ${
+            value === ''
+              ? 'border-amber-500 ring-2 ring-amber-500 bg-amber-500/10'
+              : 'border-dashed border-slate-600 bg-slate-800 hover:bg-slate-700'
+          }`}
+        >
+          <span className="font-bold text-slate-300">✕ Sin lente / Personalizado</span>
+          <p className="text-xs text-slate-400 mt-1">Introduce Focal Length a mano</p>
+        </button>
 
         {filtered.length === 0 && (
 

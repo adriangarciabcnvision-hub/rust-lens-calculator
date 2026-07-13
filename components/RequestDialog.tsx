@@ -6,14 +6,15 @@ import { COMMON_CAMERAS, COMMON_LENSES } from '@/lib/commonCatalog';
 
 interface RequestDialogProps {
   onClose: () => void;
+  initialType?: 'camera' | 'lens';
 }
 
 const inputClass =
   'w-full px-2 py-1 text-sm bg-slate-700 text-white rounded border border-slate-600 focus:border-amber-500 focus:outline-none';
 
-export function RequestDialog({ onClose }: RequestDialogProps) {
+export function RequestDialog({ onClose, initialType = 'camera' }: RequestDialogProps) {
   const { addRequest, cameras, lenses, requests } = useDataStore();
-  const [type, setType] = useState<'camera' | 'lens'>('camera');
+  const [type, setType] = useState<'camera' | 'lens'>(initialType);
   const [requestedBy, setRequestedBy] = useState('');
   const [sent, setSent] = useState(false);
 

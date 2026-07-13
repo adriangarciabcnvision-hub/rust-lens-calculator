@@ -23,6 +23,16 @@ create table if not exists cameras (
 -- Si la tabla ya existía de una instalación anterior (sin estas columnas), esto la pone al día sin tocar datos
 alter table cameras add column if not exists max_fps numeric;
 alter table cameras add column if not exists readout numeric;
+-- Añadidas 2026-07: ficha ampliada de cámara (antes solo "name"/dimensiones). Sin estas
+-- columnas, upsertCameras falla en silencio (PostgREST rechaza columnas inexistentes) y un
+-- reload borra manufacturer/model/etc. de vuelta a lo que hubiera en Supabase — EJECUTAR ESTE
+-- BLOQUE en el SQL Editor de Supabase si el catálogo "pierde" el fabricante tras recargar.
+alter table cameras add column if not exists manufacturer text;
+alter table cameras add column if not exists model text;
+alter table cameras add column if not exists sensor text;
+alter table cameras add column if not exists interface text;
+alter table cameras add column if not exists shutter text;
+alter table cameras add column if not exists color text;
 
 create table if not exists lenses (
   id text primary key,
@@ -31,6 +41,16 @@ create table if not exists lenses (
   aperture text,
   created_at timestamptz not null default now()
 );
+
+-- Añadidas 2026-07: ficha ampliada de lente (mismo motivo que en cameras)
+alter table lenses add column if not exists manufacturer text;
+alter table lenses add column if not exists model text;
+alter table lenses add column if not exists mount text;
+alter table lenses add column if not exists max_sensor text;
+alter table lenses add column if not exists telecentric text;
+alter table lenses add column if not exists working_distance_min numeric;
+alter table lenses add column if not exists working_distance_max numeric;
+alter table lenses add column if not exists source_url text;
 
 create table if not exists catalog_requests (
   id text primary key,
