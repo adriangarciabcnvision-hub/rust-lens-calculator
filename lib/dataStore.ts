@@ -18,21 +18,44 @@ export const ROLE_LABELS: Record<StoredUser['role'], string> = {
 
 export interface StoredCamera {
   id: string;
-  name: string;
+
+  name: string;               // ← seguir usándolo
+
+  manufacturer?: string;
+  model?: string;
+  sensor?: string;
+
+  interface?: string;
+  shutter?: 'Global' | 'Rolling';
+  color?: 'Mono' | 'Color';
+
   sensorWidth: number;
   sensorHeight: number;
   pixelSize: number;
   resolutionH: number;
   resolutionV: number;
+
   maxFps?: number;
   readout?: number;
 }
 
 export interface StoredLens {
   id: string;
-  name: string;
+
+    name: string;               // ← seguir usándolo
+
+  manufacturer?: string;
+  model: string;
+
   focalLength: number;
+
   aperture?: string;
+
+  mount?: string;
+
+  maxSensor?: string;
+
+  telecentric?: boolean;
 }
 
 export interface CatalogRequest {

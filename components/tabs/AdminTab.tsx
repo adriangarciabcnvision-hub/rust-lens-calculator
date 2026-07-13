@@ -11,9 +11,27 @@ import { round } from '@/lib/calculationEngine';
 // Cabeceras de las plantillas Excel (se aceptan también equivalentes en inglés al importar).
 // Ancho_mm/Alto_mm/Readout_ms NO están aquí a propósito: se calculan siempre solos
 // (Res×Píxel y 1000/MaxFPS) y no se piden ni se exportan.
-const CAMERA_HEADERS = { name: 'Nombre', pixelSize: 'Pixel_um', resolutionH: 'ResH_px', resolutionV: 'ResV_px', maxFps: 'MaxFPS' };
-const LENS_HEADERS = { name: 'Nombre', focalLength: 'Focal_mm', aperture: 'Apertura' };
-
+const CAMERA_HEADERS = {
+  manufacturer: 'Manufacturer',
+  model: 'Model',
+  sensor: 'Sensor',
+  pixelSize: 'Pixel_um',
+  resolutionH: 'ResH_px',
+  resolutionV: 'ResV_px',
+  maxFps: 'MaxFPS',
+  interface: 'Interface',
+  shutter: 'Shutter',
+  color: 'Color'
+};
+const LENS_HEADERS = {
+  manufacturer: 'Manufacturer',
+  model: 'Model',
+  focalLength: 'Focal_mm',
+  aperture: 'Aperture',
+  mount: 'Mount',
+  maxSensor: 'MaxSensor',
+  telecentric: 'Telecentric'
+};
 const num = (v: any): number => {
   const n = parseFloat(String(v ?? '').replace(',', '.'));
   return isNaN(n) ? 0 : n;
@@ -101,31 +119,87 @@ export function AdminTab() {
     XLSX.writeFile(wb, filename);
   };
 
-  const handleExportCameras = () => {
-    const rows = data.cameras.length
-      ? data.cameras.map((c) => ({
-          [CAMERA_HEADERS.name]: c.name,
-          [CAMERA_HEADERS.pixelSize]: c.pixelSize,
-          [CAMERA_HEADERS.resolutionH]: c.resolutionH,
-          [CAMERA_HEADERS.resolutionV]: c.resolutionV,
-          [CAMERA_HEADERS.maxFps]: c.maxFps ?? '',
-        }))
-      : [{ [CAMERA_HEADERS.name]: 'Ejemplo IMX264', [CAMERA_HEADERS.pixelSize]: 3.45, [CAMERA_HEADERS.resolutionH]: 2448, [CAMERA_HEADERS.resolutionV]: 2048, [CAMERA_HEADERS.maxFps]: 30 }];
-    exportExcel(rows, 'Camaras', 'catalogo_camaras.xlsx');
-    notify(data.cameras.length ? `✓ ${data.cameras.length} cámaras exportadas` : '✓ Plantilla de cámaras descargada');
-  };
+const handleExportCameras = () => {
+  const rows = data.cameras.length
+    ? data.cameras.map((c) => ({
+        [CAMERA_HEADERS.manufacturer]: c.manufacturer ?? '',
+        [CAMERA_HEADERS.model]: c.model ?? c.name,
+        [CAMERA_HEADERS.sensor]: c.sensor ?? '',
 
-  const handleExportLenses = () => {
-    const rows = data.lenses.length
-      ? data.lenses.map((l) => ({
-          [LENS_HEADERS.name]: l.name,
-          [LENS_HEADERS.focalLength]: l.focalLength,
-          [LENS_HEADERS.aperture]: l.aperture || '',
-        }))
-      : [{ [LENS_HEADERS.name]: 'Ejemplo 25mm f/1.8', [LENS_HEADERS.focalLength]: 25, [LENS_HEADERS.aperture]: 'f/1.8' }];
-    exportExcel(rows, 'Lentes', 'catalogo_lentes.xlsx');
-    notify(data.lenses.length ? `✓ ${data.lenses.length} lentes exportados` : '✓ Plantilla de lentes descargada');
-  };
+        [CAMERA_HEADERS.pixelSize]: c.pixelSize,
+        [CAMERA_HEADERS.resolutionH]: c.resolutionH,
+        [CAMERA_HEADERS.resolutionV]: c.resolutionV,
+        [CAMERA_HEADERS.maxFps]: c.maxFps ?? '',
+
+        [CAMERA_HEADERS.interface]: c.interface ?? '',
+        [CAMERA_HEADERS.shutter]: c.shutter ?? '',
+        [CAMERA_HEADERS.color]: c.color ?? '',
+      }))
+    : [{
+        [CAMERA_HEADERS.manufacturer]: 'Basler',
+        [CAMERA_HEADERS.model]: 'acA2440-20gm',
+        [CAMERA_HEADERS.sensor]: 'Sony IMX264',
+
+        [CAMERA_HEADERS.pixelSize]: 3.45,
+        [CAMERA_HEADERS.resolutionH]: 2448,
+        [CAMERA_HEADERS.resolutionV]: 2048,
+        [CAMERA_HEADERS.maxFps]: 20,
+
+        [CAMERA_HEADERS.interface]: 'GigE',
+        [CAMERA_HEADERS.shutter]: 'Global',
+        [CAMERA_HEADERS.color]: 'Mono',
+      }];
+
+  exportExcel(rows, 'Camaras', 'catalogo_camaras.xlsx');
+
+  notify(
+    data.cameras.length
+      ? `✓ ${data.cameras.length} cámaras exportadas`
+      : '✓ Plantilla de cámaras descargada'
+  );
+};
+
+const handleExportLenses = () => {
+  const rows = data.lenses.length
+    ? data.lenses.map((l) => ({
+        [LENS_HEADERS.manufacturer]: l.manufacturer ?? '',
+        [LENS_HEADERS.model]: l.model ?? l.name,
+
+        [LENS_HEADERS.focalLength]: l.focalLength,
+        [LENS_HEADERS.aperture]: l.aperture ?? '',
+
+        [LENS_HEADERS.mount]: l.mount ?? '',
+        [LENS_HEADERS.maxSensor]: l.maxSensor ?? '',
+
+        [LENS_HEADERS.telecentric]:
+          l.telecentric === undefined
+            ? ''
+            : l.telecentric
+            ? 'Yes'
+            : 'No',
+      }))
+    : [{
+        [LENS_HEADERS.manufacturer]: 'Computar',
+        [LENS_HEADERS.model]: 'M2514-MP2',
+
+        [LENS_HEADERS.focalLength]: 25,
+        [LENS_HEADERS.aperture]: 'f/1.4',
+
+        [LENS_HEADERS.mount]: 'C',
+
+        [LENS_HEADERS.maxSensor]: '2/3"',
+
+        [LENS_HEADERS.telecentric]: 'No',
+      }];
+
+  exportExcel(rows, 'Lentes', 'catalogo_lentes.xlsx');
+
+  notify(
+    data.lenses.length
+      ? `✓ ${data.lenses.length} lentes exportados`
+      : '✓ Plantilla de lentes descargada'
+  );
+};
 
   const readSheet = async (file: File): Promise<any[]> => {
     const XLSX = await import('xlsx');
@@ -168,22 +242,126 @@ export function AdminTab() {
     if (cameraFileRef.current) cameraFileRef.current.value = '';
   };
 
-  const handleImportLenses = async (file: File | undefined) => {
-    if (!file) return;
-    try {
-      const rows = await readSheet(file);
-      const lenses: Omit<StoredLens, 'id'>[] = rows.map((r: any) => ({
-        name: String(pick(r, 'Nombre', 'Name', 'name') ?? ''),
-        focalLength: num(pick(r, 'Focal_mm', 'FocalLength', 'focalLength', 'Focal')),
-        aperture: pick(r, 'Apertura', 'Aperture', 'aperture') ? String(pick(r, 'Apertura', 'Aperture', 'aperture')) : undefined,
-      }));
-      const count = data.importLenses(lenses);
-      notify(count ? `✓ ${count} lentes importados` : '⚠️ Ninguna fila válida (revisa las columnas: Nombre, Focal_mm, Apertura)');
-    } catch {
-      notify('⚠️ No se pudo leer el archivo');
-    }
-    if (lensFileRef.current) lensFileRef.current.value = '';
-  };
+const handleImportLenses = async (file: File | undefined) => {
+
+  if (!file) return;
+
+  try {
+
+    const rows = await readSheet(file);
+
+    const lenses: Omit<StoredLens, 'id'>[] =
+      rows.map((r: any) => {
+
+        const manufacturer = String(
+          pick(r, 'Manufacturer', 'manufacturer') ?? ''
+        ).trim();
+
+        const model = String(
+          pick(
+            r,
+            'Model',
+            'model',
+            'Nombre',
+            'Name',
+            'name'
+          ) ?? ''
+        ).trim();
+
+        const aperture = String(
+          pick(
+            r,
+            'Aperture',
+            'aperture',
+            'Apertura'
+          ) ?? ''
+        ).trim();
+
+        const mount = String(
+          pick(
+            r,
+            'Mount',
+            'mount'
+          ) ?? ''
+        ).trim();
+
+        const maxSensor = String(
+          pick(
+            r,
+            'MaxSensor',
+            'maxSensor'
+          ) ?? ''
+        ).trim();
+
+        const telecentricText = String(
+          pick(
+            r,
+            'Telecentric',
+            'telecentric'
+          ) ?? ''
+        ).trim().toLowerCase();
+
+        return {
+
+          // Compatibilidad
+          name:
+            manufacturer && model
+              ? `${manufacturer} ${model}`
+              : model,
+
+          manufacturer,
+
+          model,
+
+          focalLength: num(
+            pick(
+              r,
+              'Focal_mm',
+              'FocalLength',
+              'focalLength',
+              'Focal'
+            )
+          ),
+
+          aperture: aperture || undefined,
+
+          mount: mount || undefined,
+
+          maxSensor: maxSensor || undefined,
+
+          telecentric:
+            telecentricText === ''
+              ? undefined
+              : telecentricText === 'yes' ||
+                telecentricText === 'true' ||
+                telecentricText === 'si' ||
+                telecentricText === 'sí',
+        };
+
+      });
+
+    const count =
+      data.importLenses(lenses);
+
+    notify(
+      count
+        ? `✓ ${count} lentes importados`
+        : '⚠️ Ninguna lente válida encontrada'
+    );
+
+  }
+  catch {
+
+    notify(
+      '⚠️ No se pudo leer el archivo'
+    );
+
+  }
+
+  if (lensFileRef.current)
+    lensFileRef.current.value = '';
+
+};
 
   if (!currentUser) {
     return (
