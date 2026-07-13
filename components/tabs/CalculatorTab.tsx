@@ -185,12 +185,17 @@ export function CalculatorTab() {
 const motionBlur =
 useMemo(()=>{
 
+const fovHorizontal =
+(store.sensorWidth / store.focalLength)
+* store.workingDistance;
+
 const mmPerPixel =
-    store.results?.spatialResolution ??
-    (
-      ((store.sensorWidth/store.focalLength)*store.workingDistance)
-      / store.resolution_h
-    );
+store.results?.spatialResolution ??
+(
+    ((store.sensorWidth/store.focalLength)
+    *store.workingDistance)
+    /store.resolution_h
+);
     return calculateMotionBlur({
 
         velocityMmPerSec:
@@ -328,7 +333,7 @@ store.setResults({
   // DOF: puramente derivado de focal/WD/apertura actuales (el hiperfocal se sigue calculando
   // internamente porque near/far dependen de él, pero ya no se muestra)
   const dofResults = useMemo(() => {
-    if (store.focalLength <= 0 || store.fNumber <= 0 || store.circleOfConfusion <= 0) return null;
+    if (store.focalLength <= 0 || store.fNumber <= 0 || store.circleOfConfusion <= 0 || store.workingDistance <= 0) return null;
     return calculateDepthOfField({
       focalLengthMm: store.focalLength,
       workingDistanceMm: store.workingDistance,

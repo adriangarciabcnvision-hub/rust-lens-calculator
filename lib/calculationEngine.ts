@@ -268,7 +268,9 @@ export function calculateMotionBlur(
  *
  * DOF Total = Far - Near
  */
-export function calculateDepthOfField(req: DepthOfFieldRequest): DepthOfFieldResult {
+export function calculateDepthOfField(
+  req: DepthOfFieldRequest
+): DepthOfFieldResult {
   try {
     const {
       focalLengthMm,
@@ -278,44 +280,84 @@ export function calculateDepthOfField(req: DepthOfFieldRequest): DepthOfFieldRes
       minimumFocusDistanceMm = 0.3,
     } = req;
 
-    if (focalLengthMm <= 0 || fNumberAperture <= 0 || circleOfConfusionMm <= 0) {
-      return { success: false, error: 'Parameters must be positive' };
+    if (
+      focalLengthMm <= 0 ||
+      workingDistanceMm <= focalLengthMm ||
+      fNumberAperture <= 0 ||
+      circleOfConfusionMm <= 0
+    ) {
+      return {
+        success: false,
+        error: "Invalid optical parameters",
+      };
     }
 
-    // Distancia hiperfocal: H = (f²) / (N × c) + f
+    // Distancia hiperfocal
     const hyperfocal =
-      (focalLengthMm * focalLengthMm) / (fNumberAperture * circleOfConfusionMm) +
+      (focalLengthMm * focalLengthMm) /
+        (fNumberAperture * circleOfConfusionMm) +
       focalLengthMm;
 
-    // Límite cercano: N = (H × s) / (H + (s - f))
-    const numeratorNear = hyperfocal * workingDistanceMm;
-    const denominatorNear = hyperfocal + (workingDistanceMm - focalLengthMm);
-    const nearLimit = denominatorNear !== 0 ? numeratorNear / denominatorNear : workingDistanceMm;
+    const hs = hyperfocal * workingDistanceMm;
 
-    // Límite lejano: F = (H × s) / (H - (s - f))
-    const numeratorFar = hyperfocal * workingDistanceMm;
-    const denominatorFar = hyperfocal - (workingDistanceMm - focalLengthMm);
-    const farLimit = denominatorFar !== 0 ? numeratorFar / denominatorFar : Infinity;
+    const nearLimit =
+      hs /
+      (hyperfocal +
+        (workingDistanceMm - focalLengthMm));
 
-    // Profundidad de campo total
-    const totalDoF = isFinite(farLimit) ? farLimit - nearLimit : Infinity;
+    let farLimit: number;
 
-    // Distancia efectiva mínima de enfoque
-    const effectiveMinimumFocus = Math.max(minimumFocusDistanceMm, nearLimit);
+    if (workingDistanceMm >= hyperfocal) {
+      farLimit = Infinity;
+    } else {
+      farLimit =
+        hs /
+        (hyperfocal -
+          (workingDistanceMm - focalLengthMm));
+    }
+
+    const totalDoF =
+      isFinite(farLimit)
+        ? farLimit - nearLimit
+        : Infinity;
 
     return {
       success: true,
-      effectiveMinimumFocusDistance: round(effectiveMinimumFocus, 3),
+
+      effectiveMinimumFocusDistance:
+        round(
+          Math.max(
+            minimumFocusDistanceMm,
+            nearLimit
+          ),
+          3
+        ),
+
       nearLimit: round(nearLimit, 2),
-      farLimit: isFinite(farLimit) ? round(farLimit, 2) : Infinity,
-      totalDepthOfField: isFinite(totalDoF) ? round(totalDoF, 2) : Infinity,
-      hyperfocalDistance: round(hyperfocal, 2),
-      lensApertureHint: `f/${fNumberAperture.toFixed(1)}`,
+
+      farLimit:
+        isFinite(farLimit)
+          ? round(farLimit, 2)
+          : Infinity,
+
+      totalDepthOfField:
+        isFinite(totalDoF)
+          ? round(totalDoF, 2)
+          : Infinity,
+
+      hyperfocalDistance:
+        round(hyperfocal, 2),
+
+      lensApertureHint:
+        `f/${fNumberAperture.toFixed(1)}`,
     };
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Unknown error',
+      error:
+        error instanceof Error
+          ? error.message
+          : "Unknown error",
     };
   }
 }
@@ -331,37 +373,63 @@ export function calculateDepthOfField(req: DepthOfFieldRequest): DepthOfFieldRes
  *   - Marginal:     PixelsPerModule ≥ Threshold
  *   - Not Readable: PixelsPerModule < Threshold
  */
-export function calculateCodeReadability(req: CodeReadabilityRequest): CodeReadabilityResult {
+export function calculateCodeReadability(
+  req: CodeReadabilityRequest
+): CodeReadabilityResult {
   try {
-    const { mmPerPixel, moduleSizeMm, thresholdPixelsPerModule } = req;
+    const {
+      mmPerPixel,
+      moduleSizeMm,
+    } = req;
 
-    if (mmPerPixel <= 0 || moduleSizeMm <= 0 || thresholdPixelsPerModule <= 0) {
-      return { success: false, error: 'Parameters must be positive' };
+    if (
+      mmPerPixel <= 0 ||
+      moduleSizeMm <= 0
+    ) {
+      return {
+        success: false,
+        error: "Parameters must be positive",
+      };
     }
 
-    // Píxeles por módulo = Tamaño_módulo / mm_per_pixel
-    const pixelsPerModule = moduleSizeMm / mmPerPixel;
+    // Pixels per Module
+    const pixelsPerModule =
+      moduleSizeMm / mmPerPixel;
 
-    // Veredicto según AIM standard
-    let verdict: 'readable' | 'marginal' | 'not_readable';
-    if (pixelsPerModule >= thresholdPixelsPerModule * 2) {
-      verdict = 'readable';
-    } else if (pixelsPerModule >= thresholdPixelsPerModule) {
-      verdict = 'marginal';
-    } else {
-      verdict = 'not_readable';
+    let verdict:
+      | "readable"
+      | "marginal"
+      | "not_readable";
+
+    if (pixelsPerModule >= 4) {
+      verdict = "readable";
+    }
+    else if (pixelsPerModule >= 2) {
+      verdict = "marginal";
+    }
+    else {
+      verdict = "not_readable";
     }
 
     return {
       success: true,
-      pixelsPerModule: round(pixelsPerModule, 2),
+      pixelsPerModule: round(
+        pixelsPerModule,
+        2
+      ),
       verdict,
     };
+
   } catch (error) {
+
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Unknown error',
+      error:
+        error instanceof Error
+          ? error.message
+          : "Unknown error",
     };
+
   }
 }
 
