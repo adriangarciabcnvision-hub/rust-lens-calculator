@@ -60,6 +60,7 @@ function detectSensorFormat(widthMm: number, heightMm: number): string {
 
 const CUSTOM_FORMAT_VALUE = '__custom__';
 
+
 export function CalculatorTab() {
   const store = useCalculatorStore();
   const dataStore = useDataStore();
@@ -389,16 +390,76 @@ store.setResults({
     }
     if (motionTarget === 'velocity') {
       const velocity = fotosPerMmDeseado > 0 && fpsDeseado > 0 ? fpsDeseado / fotosPerMmDeseado : 0;
-      const exposure = fpsDeseado > 0 ? Math.max(0, 1000 / fpsDeseado - readout) : 0;
+      const exposureByFps =
+    fpsDeseado > 0
+        ? Math.max(0, 1000 / fpsDeseado - readout)
+        : 0;
+
+const blurLimit =
+    inspectionType === 'undefined'
+        ? Number.MAX_VALUE
+        : INSPECTION_BLUR_THRESHOLDS[inspectionType];
+
+const exposureByBlur =
+    store.velocity > 0 &&
+    (store.results?.spatialResolution ?? 0) > 0
+        ? (blurLimit *
+            (store.results?.spatialResolution ?? 0) *
+            1000) /
+          store.velocity
+        : Number.MAX_VALUE;
+
+const exposure =
+    Math.min(exposureByFps, exposureByBlur);
       return { fps: fpsDeseado, exposure, velocity, fotosPerMm: fotosPerMmDeseado };
     }
     if (motionTarget === 'fotosPerMm') {
       const fotosPerMm = store.velocity > 0 && fpsDeseado > 0 ? fpsDeseado / store.velocity : 0;
-      const exposure = fpsDeseado > 0 ? Math.max(0, 1000 / fpsDeseado - readout) : 0;
+      const exposureByFps =
+    fpsDeseado > 0
+        ? Math.max(0, 1000 / fpsDeseado - readout)
+        : 0;
+
+const blurLimit =
+    inspectionType === 'undefined'
+        ? Number.MAX_VALUE
+        : INSPECTION_BLUR_THRESHOLDS[inspectionType];
+
+const exposureByBlur =
+    store.velocity > 0 &&
+    (store.results?.spatialResolution ?? 0) > 0
+        ? (blurLimit *
+            (store.results?.spatialResolution ?? 0) *
+            1000) /
+          store.velocity
+        : Number.MAX_VALUE;
+
+const exposure =
+    Math.min(exposureByFps, exposureByBlur);
       return { fps: fpsDeseado, exposure, velocity: store.velocity, fotosPerMm };
     }
     // 'exposure' (por defecto): dado el FPS deseado, calcula la exposición máxima
-    const exposure = fpsDeseado > 0 ? Math.max(0, 1000 / fpsDeseado - readout) : 0;
+   const exposureByFps =
+    fpsDeseado > 0
+        ? Math.max(0, 1000 / fpsDeseado - readout)
+        : 0;
+
+const blurLimit =
+    inspectionType === 'undefined'
+        ? Number.MAX_VALUE
+        : INSPECTION_BLUR_THRESHOLDS[inspectionType];
+
+const exposureByBlur =
+    store.velocity > 0 &&
+    (store.results?.spatialResolution ?? 0) > 0
+        ? (blurLimit *
+            (store.results?.spatialResolution ?? 0) *
+            1000) /
+          store.velocity
+        : Number.MAX_VALUE;
+
+const exposure =
+    Math.min(exposureByFps, exposureByBlur);
     const fotosPerMm = store.velocity > 0 && fpsDeseado > 0 ? fpsDeseado / store.velocity : 0;
     return { fps: fpsDeseado, exposure, velocity: store.velocity, fotosPerMm };
   }, [motionTarget, store.exposure, store.velocity, store.maxFps, store.readout, fpsDeseado, fotosPerMmDeseado]);

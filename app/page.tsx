@@ -9,14 +9,22 @@ import { CodeReadabilityTab } from '@/components/tabs/CodeReadabilityTab';
 import { AdminTab } from '@/components/tabs/AdminTab';
 import { HelpModal } from '@/components/HelpModal';
 import { useDataStore } from '@/lib/dataStore';
+import { PrecisionTab } from '@/components/tabs/PrecisionTab';
 
 // DOF y Frame Rate viven ahora como secciones dentro de Calculadora (ver CalculatorTab)
 const TABS = [
   { id: 'calculator', label: '📊 Calculadora', component: CalculatorTab },
+
   { id: 'diagnostics', label: '📋 Diagnóstico', component: DiagnosticsTab },
+
+  { id: 'precision', label: '📏 Precisión', component: PrecisionTab },
+
   { id: 'optical', label: '🔬 Óptica', component: OpticalDiagramTab },
+
   { id: 'comparator', label: '🔄 Comparador', component: ComparatorTab },
+
   { id: 'codes', label: '📖 Códigos', component: CodeReadabilityTab },
+
   { id: 'admin', label: '🔐 Admin', component: AdminTab },
 ];
 
