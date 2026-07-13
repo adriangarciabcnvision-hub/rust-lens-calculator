@@ -19,7 +19,7 @@ export default function CameraSelector({
 }: CameraSelectorProps) {
 
   const { cameras } = useDataStore();
-
+const [showFilters, setShowFilters] = useState(false);
   const [filters,setFilters] = useState({
 
     manufacturer:'',
@@ -166,39 +166,86 @@ if (
         className="w-full px-3 py-2 rounded bg-slate-700 border border-slate-600 text-white"
       />
 
+       <div className="flex items-center justify-between">
+
+    <button
+        onClick={() => setShowFilters(!showFilters)}
+        className="text-sm text-amber-400 hover:text-amber-300"
+    >
+        {showFilters ? '▲ Ocultar filtros' : '▼ Filtros avanzados'}
+    </button>
+
+    {showFilters && (
+
+        <button
+            onClick={() => {
+
+                setFilters({
+
+                    manufacturer: '',
+
+                    interface: '',
+
+                    shutter: '',
+
+                    color: '',
+
+                    sensor: ''
+
+                });
+
+            }}
+            className="text-xs text-red-400 hover:text-red-300"
+        >
+            Limpiar filtros
+        </button>
+
+    )}
+
+</div>
+
+{showFilters && (
+
+    <div className="space-y-3">
+
         <FilterChips
-        title="Fabricante"
-        values={manufacturers}
-        selected={filters.manufacturer}
-        onChange={(v) => updateFilter('manufacturer', v)}
+            title="Fabricante"
+            values={manufacturers}
+            selected={filters.manufacturer}
+            onChange={(v) => updateFilter('manufacturer', v)}
         />
 
         <FilterChips
-        title="Interface"
-        values={interfaces}
-        selected={filters.interface}
-        onChange={(v) => updateFilter('interface', v)}
+            title="Interface"
+            values={interfaces}
+            selected={filters.interface}
+            onChange={(v) => updateFilter('interface', v)}
         />
 
         <FilterChips
-        title="Shutter"
-        values={shutters}
-        selected={filters.shutter}
-        onChange={(v) => updateFilter('shutter', v)}
+            title="Shutter"
+            values={shutters}
+            selected={filters.shutter}
+            onChange={(v) => updateFilter('shutter', v)}
         />
+
         <FilterChips
             title="Sensor"
             values={sensors}
             selected={filters.sensor}
             onChange={(v) => updateFilter('sensor', v)}
-            />
+        />
 
-            <FilterChips
+        <FilterChips
             title="Color"
             values={colors}
             selected={filters.color}
             onChange={(v) => updateFilter('color', v)}
-            />
+        />
+
+    </div>
+
+)}
 
       <div className="text-xs text-slate-400">
         {filtered.length} cámara{filtered.length !== 1 ? 's' : ''} encontrada{filtered.length !== 1 ? 's' : ''}
