@@ -2,245 +2,250 @@
 
 import { Card } from '@/components/ui/Card';
 import { useCalculatorStore } from '@/lib/store';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import * as THREE from 'three';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+
+// Colores del tema (dorado/negro EQUIPO RUST) trasladados a la escena 3D
+const COLOR_BG = 0x0a0907;
+const COLOR_GRID = 0x262014;
+const COLOR_OBJECT = 0xfbbf24; // amber
+const COLOR_LENS = 0x3b82f6; // blue
+const COLOR_SENSOR = 0x10b981; // green
+const COLOR_RAY = 0xec4899; // pink
+const COLOR_AXIS = 0x64748b; // slate
 
 export function OpticalDiagramTab() {
   const store = useCalculatorStore();
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const mountRef = useRef<HTMLDivElement>(null);
+  const sceneRef = useRef<THREE.Scene | null>(null);
+  const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
+  const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
+  const controlsRef = useRef<OrbitControls | null>(null);
+  const contentGroupRef = useRef<THREE.Group | null>(null);
+  const frameIdRef = useRef<number>(0);
+  const [hasScene, setHasScene] = useState(false);
 
-  const drawOpticalDiagram = () => {
-    if (!canvasRef.current || !store.results?.fovHorizontalMm) return;
+  // El FOV siempre es derivable de los parámetros actuales; si hay un cálculo previo se usa ese
+  const results: { fovHorizontalMm: number; fovVerticalMm: number; magnification: number } =
+    store.results?.fovHorizontalMm !== undefined
+      ? {
+          fovHorizontalMm: store.results.fovHorizontalMm,
+          fovVerticalMm: store.results.fovVerticalMm ?? 0,
+          magnification: store.results.magnification ?? 0,
+        }
+      : {
+          fovHorizontalMm: store.focalLength > 0 ? (store.sensorWidth / store.focalLength) * store.workingDistance : 0,
+          fovVerticalMm: store.focalLength > 0 ? (store.sensorHeight / store.focalLength) * store.workingDistance : 0,
+          magnification: store.workingDistance > 0 ? store.focalLength / store.workingDistance : 0,
+        };
 
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+  const canRender = store.focalLength > 0 && store.workingDistance > 0 && store.sensorWidth > 0 && store.sensorHeight > 0;
 
-    const w = canvas.width;
-    const h = canvas.height;
-    const padding = 60;
-    const canvasWidth = w - padding * 2;
-    const canvasHeight = h - padding * 2;
-
-    // Fondo limpio
-    ctx.fillStyle = '#0f172a';
-    ctx.fillRect(0, 0, w, h);
-
-    // Determinar escala
-    const totalDistance = Math.max(store.workingDistance, 100) + store.focalLength;
-    const scale = canvasWidth / totalDistance;
-    const maxFovHalf = store.results.fovHorizontalMm / 2;
-    const fovScale = Math.min(scale, (canvasHeight / 2) / Math.max(maxFovHalf, 50));
-    const finalScale = Math.min(scale, fovScale);
-
-    // Posiciones
-    const centerY = h / 2;
-    const objectX = padding + 20;
-    const lensX = padding + store.workingDistance * finalScale;
-    const sensorX = lensX + store.focalLength * finalScale;
-
-    // ===== FONDO CON GRID =====
-    ctx.strokeStyle = '#1e293b';
-    ctx.lineWidth = 0.5;
-    for (let i = 0; i < w; i += 40) {
-      ctx.beginPath();
-      ctx.moveTo(i, 0);
-      ctx.lineTo(i, h);
-      ctx.stroke();
-    }
-    for (let i = 0; i < h; i += 40) {
-      ctx.beginPath();
-      ctx.moveTo(0, i);
-      ctx.lineTo(w, i);
-      ctx.stroke();
-    }
-
-    // ===== EJE ÓPTICO =====
-    ctx.strokeStyle = '#64748b';
-    ctx.lineWidth = 2;
-    ctx.setLineDash([8, 4]);
-    ctx.beginPath();
-    ctx.moveTo(padding, centerY);
-    ctx.lineTo(w - padding, centerY);
-    ctx.stroke();
-    ctx.setLineDash([]);
-
-    // ===== OBJETO (ARROW izquierda) =====
-    const objHalfHeight = maxFovHalf * finalScale;
-    ctx.fillStyle = '#fbbf24';
-    ctx.strokeStyle = '#f59e0b';
-    ctx.lineWidth = 3;
-
-    // Flecha del objeto
-    ctx.beginPath();
-    ctx.moveTo(objectX, centerY - objHalfHeight);
-    ctx.lineTo(objectX, centerY + objHalfHeight);
-    ctx.stroke();
-
-    // Punta de flecha arriba
-    ctx.beginPath();
-    ctx.moveTo(objectX - 6, centerY - objHalfHeight + 8);
-    ctx.lineTo(objectX, centerY - objHalfHeight);
-    ctx.lineTo(objectX + 6, centerY - objHalfHeight + 8);
-    ctx.stroke();
-
-    // Círculo en el objeto
-    ctx.fillStyle = '#fbbf24';
-    ctx.beginPath();
-    ctx.arc(objectX, centerY - objHalfHeight, 4, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Etiqueta OBJETO
-    ctx.fillStyle = '#fbbf24';
-    ctx.font = 'bold 12px Arial';
-    ctx.textAlign = 'right';
-    ctx.fillText('OBJETO', objectX - 15, centerY - objHalfHeight - 20);
-    ctx.textAlign = 'left';
-    ctx.fillStyle = '#cbd5e1';
-    ctx.font = '10px Arial';
-    ctx.fillText(`H=${store.results.fovHorizontalMm.toFixed(1)}mm`, objectX + 10, centerY - objHalfHeight - 10);
-
-    // ===== LENTE (CÍRCULO en medio) =====
-    ctx.strokeStyle = '#3b82f6';
-    ctx.lineWidth = 3;
-    ctx.fillStyle = '#3b82f640';
-
-    // Círculo lente
-    ctx.beginPath();
-    ctx.arc(lensX, centerY, 30, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.fill();
-
-    // Líneas verticales de la lente
-    ctx.strokeStyle = '#3b82f6';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(lensX, centerY - 32);
-    ctx.lineTo(lensX, centerY + 32);
-    ctx.stroke();
-
-    // Etiqueta LENTE
-    ctx.fillStyle = '#3b82f6';
-    ctx.font = 'bold 12px Arial';
-    ctx.textAlign = 'center';
-    ctx.fillText('LENTE', lensX, centerY + 50);
-    ctx.textAlign = 'left';
-    ctx.fillStyle = '#cbd5e1';
-    ctx.font = '10px Arial';
-    ctx.fillText(`f=${store.focalLength.toFixed(1)}mm`, lensX - 45, centerY - 45);
-
-    // ===== SENSOR (RECTÁNGULO derecha) =====
-    const sensorHalfHeight = (store.sensorHeight / store.sensorWidth) * 25;
-    ctx.strokeStyle = '#10b981';
-    ctx.lineWidth = 3;
-    ctx.fillStyle = '#10b98140';
-
-    ctx.strokeRect(sensorX - 25, centerY - sensorHalfHeight, 50, sensorHalfHeight * 2);
-    ctx.fillRect(sensorX - 25, centerY - sensorHalfHeight, 50, sensorHalfHeight * 2);
-
-    // Etiqueta SENSOR
-    ctx.fillStyle = '#10b981';
-    ctx.font = 'bold 12px Arial';
-    ctx.textAlign = 'center';
-    ctx.fillText('SENSOR', sensorX, centerY + sensorHalfHeight + 25);
-    ctx.textAlign = 'left';
-    ctx.fillStyle = '#cbd5e1';
-    ctx.font = '10px Arial';
-    ctx.fillText(`${store.sensorWidth.toFixed(1)}×${store.sensorHeight.toFixed(1)}mm`, sensorX - 65, centerY + sensorHalfHeight + 15);
-
-    // ===== RAYOS ÓPTICOS (líneas de luz) =====
-    ctx.strokeStyle = '#ec4899';
-    ctx.lineWidth = 2;
-
-    // Rayo superior
-    ctx.beginPath();
-    ctx.moveTo(objectX, centerY - objHalfHeight);
-    ctx.lineTo(lensX, centerY + 30);
-    ctx.lineTo(sensorX, centerY + sensorHalfHeight);
-    ctx.stroke();
-
-    // Rayo inferior
-    ctx.beginPath();
-    ctx.moveTo(objectX, centerY + objHalfHeight);
-    ctx.lineTo(lensX, centerY - 30);
-    ctx.lineTo(sensorX, centerY - sensorHalfHeight);
-    ctx.stroke();
-
-    // Rayo central (sin deflexión)
-    ctx.strokeStyle = '#a855f7';
-    ctx.setLineDash([4, 4]);
-    ctx.beginPath();
-    ctx.moveTo(objectX, centerY);
-    ctx.lineTo(lensX, centerY);
-    ctx.lineTo(sensorX, centerY);
-    ctx.stroke();
-    ctx.setLineDash([]);
-
-    // ===== DISTANCIAS (anotaciones) =====
-    ctx.strokeStyle = '#64748b';
-    ctx.lineWidth = 1;
-    ctx.fillStyle = '#cbd5e1';
-    ctx.font = '11px Arial';
-    ctx.textAlign = 'center';
-
-    // Línea Working Distance
-    const ydist = centerY + objHalfHeight + 30;
-    ctx.beginPath();
-    ctx.moveTo(objectX, ydist);
-    ctx.lineTo(lensX, ydist);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.arc(objectX, ydist, 3, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.beginPath();
-    ctx.arc(lensX, ydist, 3, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillText(`WD = ${store.workingDistance.toFixed(0)}mm`, (objectX + lensX) / 2, ydist + 15);
-
-    // Línea Focal Length
-    const yf = centerY - objHalfHeight - 30;
-    ctx.beginPath();
-    ctx.moveTo(lensX, yf);
-    ctx.lineTo(sensorX, yf);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.arc(lensX, yf, 3, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.beginPath();
-    ctx.arc(sensorX, yf, 3, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillText(`f = ${store.focalLength.toFixed(1)}mm`, (lensX + sensorX) / 2, yf - 10);
-
-    // ===== INFORMACIÓN EN ESQUINA =====
-    ctx.fillStyle = '#94a3b8';
-    ctx.font = '10px monospace';
-    ctx.textAlign = 'left';
-    const infoX = padding + 10;
-    let infoY = padding + 20;
-    ctx.fillText(`FOV H: ${store.results.fovHorizontalMm.toFixed(2)} mm`, infoX, infoY);
-    infoY += 15;
-    ctx.fillText(`FOV V: ${store.results.fovVerticalMm.toFixed(2)} mm`, infoX, infoY);
-    infoY += 15;
-    ctx.fillText(`Mag: ×${store.results.magnification.toFixed(4)}`, infoX, infoY);
-  };
-
+  // ===== Setup de la escena (una sola vez) =====
   useEffect(() => {
-    if (store.results?.fovHorizontalMm) {
-      drawOpticalDiagram();
+    const mount = mountRef.current;
+    if (!mount) return;
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(COLOR_BG);
+    sceneRef.current = scene;
+
+    const camera = new THREE.PerspectiveCamera(45, mount.clientWidth / mount.clientHeight, 0.1, 1000);
+    camera.position.set(7, 4, 9);
+    cameraRef.current = camera;
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(mount.clientWidth, mount.clientHeight);
+    mount.appendChild(renderer.domElement);
+    rendererRef.current = renderer;
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.08;
+    controls.minDistance = 2;
+    controls.maxDistance = 60;
+    controlsRef.current = controls;
+
+    scene.add(new THREE.AmbientLight(0xffffff, 0.7));
+    const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    dirLight.position.set(5, 8, 6);
+    scene.add(dirLight);
+
+    const grid = new THREE.GridHelper(20, 20, COLOR_GRID, COLOR_GRID);
+    grid.position.y = -2.5;
+    scene.add(grid);
+
+    const group = new THREE.Group();
+    scene.add(group);
+    contentGroupRef.current = group;
+
+    const animate = () => {
+      frameIdRef.current = requestAnimationFrame(animate);
+      controls.update();
+      renderer.render(scene, camera);
+    };
+    animate();
+
+    const resizeObserver = new ResizeObserver(() => {
+      if (!mount) return;
+      camera.aspect = mount.clientWidth / mount.clientHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(mount.clientWidth, mount.clientHeight);
+      renderer.render(scene, camera);
+    });
+    resizeObserver.observe(mount);
+
+    return () => {
+      cancelAnimationFrame(frameIdRef.current);
+      resizeObserver.disconnect();
+      controls.dispose();
+      renderer.dispose();
+      if (renderer.domElement.parentElement === mount) mount.removeChild(renderer.domElement);
+    };
+  }, []);
+
+  // ===== Reconstrucción del contenido de la escena en cada cambio de parámetros =====
+  useEffect(() => {
+    const group = contentGroupRef.current;
+    const camera = cameraRef.current;
+    const controls = controlsRef.current;
+    if (!group) return;
+
+    // Limpia la escena anterior liberando memoria de GPU
+    while (group.children.length) {
+      const obj = group.children.pop()!;
+      obj.traverse((child) => {
+        if (child instanceof THREE.Mesh || child instanceof THREE.Line) {
+          child.geometry.dispose();
+          const mats = Array.isArray(child.material) ? child.material : [child.material];
+          mats.forEach((m) => m.dispose());
+        }
+      });
     }
-  }, [store.results, store.workingDistance, store.focalLength, store.sensorWidth, store.sensorHeight]);
+
+    setHasScene(canRender);
+    if (!canRender || !camera || !controls) return;
+
+    const fovH = results.fovHorizontalMm;
+    const fovV = results.fovVerticalMm;
+
+    // Escalas independientes: una para las distancias (eje óptico) y otra para los tamaños
+    // (sensor/objeto), igual que en la versión 2D — si no, el sensor sería invisible frente a la WD.
+    const totalDepth = Math.max(store.focalLength + store.workingDistance, 10);
+    const depthScale = 10 / totalDepth;
+    const maxSize = Math.max(fovH, fovV, store.sensorWidth, store.sensorHeight, 5);
+    const sizeScale = 3.5 / maxSize;
+
+    const sensorZ = 0;
+    const lensZ = store.focalLength * depthScale;
+    const objectZ = (store.focalLength + store.workingDistance) * depthScale;
+
+    const sensorHalfW = (store.sensorWidth / 2) * sizeScale;
+    const sensorHalfH = (store.sensorHeight / 2) * sizeScale;
+    const objHalfW = (fovH / 2) * sizeScale;
+    const objHalfH = (fovV / 2) * sizeScale;
+    const lensRadius = Math.max(sensorHalfW, sensorHalfH) * 1.6;
+
+    // --- Eje óptico ---
+    const axisGeom = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(0, 0, sensorZ),
+      new THREE.Vector3(0, 0, objectZ),
+    ]);
+    const axisLine = new THREE.Line(axisGeom, new THREE.LineDashedMaterial({ color: COLOR_AXIS, dashSize: 0.15, gapSize: 0.1 }));
+    axisLine.computeLineDistances();
+    group.add(axisLine);
+
+    // --- Sensor (rectángulo verde) ---
+    const sensorPlane = new THREE.Mesh(
+      new THREE.PlaneGeometry(sensorHalfW * 2, sensorHalfH * 2),
+      new THREE.MeshStandardMaterial({ color: COLOR_SENSOR, transparent: true, opacity: 0.35, side: THREE.DoubleSide })
+    );
+    sensorPlane.position.z = sensorZ;
+    group.add(sensorPlane);
+    const sensorEdges = new THREE.LineSegments(
+      new THREE.EdgesGeometry(new THREE.PlaneGeometry(sensorHalfW * 2, sensorHalfH * 2)),
+      new THREE.LineBasicMaterial({ color: COLOR_SENSOR })
+    );
+    sensorEdges.position.z = sensorZ;
+    group.add(sensorEdges);
+
+    // --- Lente (disco azul) ---
+    const lensDisc = new THREE.Mesh(
+      new THREE.CylinderGeometry(lensRadius, lensRadius, 0.06, 40),
+      new THREE.MeshStandardMaterial({ color: COLOR_LENS, transparent: true, opacity: 0.4, side: THREE.DoubleSide })
+    );
+    lensDisc.rotation.x = Math.PI / 2;
+    lensDisc.position.z = lensZ;
+    group.add(lensDisc);
+    const lensRing = new THREE.Mesh(
+      new THREE.TorusGeometry(lensRadius, 0.02, 12, 40),
+      new THREE.MeshStandardMaterial({ color: COLOR_LENS })
+    );
+    lensRing.position.z = lensZ;
+    group.add(lensRing);
+
+    // --- Objeto (rectángulo ámbar, tamaño = FOV) ---
+    const objectPlane = new THREE.Mesh(
+      new THREE.PlaneGeometry(objHalfW * 2, objHalfH * 2),
+      new THREE.MeshStandardMaterial({ color: COLOR_OBJECT, transparent: true, opacity: 0.25, side: THREE.DoubleSide })
+    );
+    objectPlane.position.z = objectZ;
+    group.add(objectPlane);
+    const objectEdges = new THREE.LineSegments(
+      new THREE.EdgesGeometry(new THREE.PlaneGeometry(objHalfW * 2, objHalfH * 2)),
+      new THREE.LineBasicMaterial({ color: COLOR_OBJECT })
+    );
+    objectEdges.position.z = objectZ;
+    group.add(objectEdges);
+
+    // --- Rayos ópticos: de cada esquina/borde del objeto, pasando por el centro de la lente, al sensor ---
+    const rayCorners: [number, number][] = [
+      [objHalfW, objHalfH],
+      [-objHalfW, objHalfH],
+      [objHalfW, -objHalfH],
+      [-objHalfW, -objHalfH],
+      [0, 0],
+    ];
+    rayCorners.forEach(([ox, oy], idx) => {
+      const [sx, sy] = idx === rayCorners.length - 1 ? [0, 0] : [-ox * (sensorHalfW / objHalfW || 0), -oy * (sensorHalfH / objHalfH || 0)];
+      const rayGeom = new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(ox, oy, objectZ),
+        new THREE.Vector3(0, 0, lensZ),
+        new THREE.Vector3(sx, sy, sensorZ),
+      ]);
+      const isCenter = idx === rayCorners.length - 1;
+      const ray = new THREE.Line(
+        rayGeom,
+        new THREE.LineBasicMaterial({ color: isCenter ? 0xa855f7 : COLOR_RAY, transparent: true, opacity: isCenter ? 0.9 : 0.55 })
+      );
+      group.add(ray);
+    });
+
+    // Encuadre inicial de cámara centrado en el montaje, sin resetear si el usuario ya interactuó mucho
+    const midZ = (sensorZ + objectZ) / 2;
+    controls.target.set(0, 0, midZ);
+    camera.position.set(Math.max(objHalfW, 3) * 1.4, Math.max(objHalfH, 2) * 1.6, midZ + totalDepth * depthScale * 0.7 + 3);
+    controls.update();
+    // Render inmediato además del bucle de animación, para que el cambio se vea al instante
+    // aunque el rAF esté retrasado (pestañas en segundo plano, etc.)
+    rendererRef.current?.render(sceneRef.current!, camera);
+  }, [canRender, store.sensorWidth, store.sensorHeight, store.focalLength, store.workingDistance, results.fovHorizontalMm, results.fovVerticalMm]);
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-6 gap-3 lg:h-full lg:overflow-hidden">
-      {/* Canvas Principal */}
-      <div className="lg:col-span-4">
-        <Card title="Diagrama Óptico" icon="🔬">
-          <div className="bg-slate-950 rounded border border-slate-700 overflow-hidden">
-            <canvas
-              ref={canvasRef}
-              width={700}
-              height={500}
-              className="w-full"
-            />
+      {/* Escena 3D */}
+      <div className="lg:col-span-4 lg:h-full flex flex-col">
+        <Card title="Diagrama Óptico 3D" icon="🔬" className="flex-1 flex flex-col min-h-0">
+          <p className="text-xs text-slate-400 mb-1">🖱️ Arrastra para rotar · rueda para zoom · clic derecho para desplazar</p>
+          <div className="relative flex-1 min-h-[320px] bg-slate-950 rounded border border-slate-700 overflow-hidden">
+            <div ref={mountRef} className="w-full h-full" />
+            {!hasScene && (
+              <div className="absolute inset-0 flex items-center justify-center text-center px-4">
+                <p className="text-xs text-slate-400">Completa Sensor, Focal Length y Working Distance para ver el montaje en 3D</p>
+              </div>
+            )}
           </div>
         </Card>
       </div>
@@ -272,15 +277,15 @@ export function OpticalDiagramTab() {
           <div className="space-y-1 text-xs">
             <div className="flex justify-between bg-green-900/30 border border-green-700 p-1.5 rounded">
               <span className="text-green-300">FOV H:</span>
-              <span className="text-green-400 font-bold">{store.results?.fovHorizontalMm.toFixed(2)} mm</span>
+              <span className="text-green-400 font-bold">{results.fovHorizontalMm.toFixed(2)} mm</span>
             </div>
             <div className="flex justify-between bg-green-900/30 border border-green-700 p-1.5 rounded">
               <span className="text-green-300">FOV V:</span>
-              <span className="text-green-400 font-bold">{store.results?.fovVerticalMm.toFixed(2)} mm</span>
+              <span className="text-green-400 font-bold">{results.fovVerticalMm.toFixed(2)} mm</span>
             </div>
             <div className="flex justify-between bg-blue-900/30 border border-blue-700 p-1.5 rounded">
               <span className="text-blue-300">Magnification:</span>
-              <span className="text-blue-400 font-bold">×{store.results?.magnification.toFixed(4)}</span>
+              <span className="text-blue-400 font-bold">×{results.magnification.toFixed(4)}</span>
             </div>
           </div>
         </Card>
@@ -288,8 +293,8 @@ export function OpticalDiagramTab() {
         <Card title="Leyenda Visual" icon="📍" className="p-2">
           <div className="space-y-2 text-xs">
             <div className="flex items-center gap-2">
-              <div className="w-4 h-4 bg-yellow-400 rounded-full"></div>
-              <span>Objeto</span>
+              <div className="w-4 h-4 bg-yellow-400 rounded"></div>
+              <span>Objeto (tamaño = FOV)</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="w-4 h-4 bg-blue-400 rounded-full"></div>
@@ -305,13 +310,13 @@ export function OpticalDiagramTab() {
             </div>
             <div className="flex items-center gap-2">
               <div className="w-4 h-1 bg-purple-400" style={{ backgroundImage: 'repeating-linear-gradient(90deg, #a855f7 0px, #a855f7 4px, transparent 4px, transparent 8px)' }}></div>
-              <span>Eje óptico</span>
+              <span>Rayo central</span>
             </div>
           </div>
         </Card>
 
         <Card title="Nota" icon="ℹ️" className="p-2">
-          <p className="text-xs text-slate-300">Diagrama esquemático basado en aproximación de lente delgada (paraxial)</p>
+          <p className="text-xs text-slate-300">Diagrama esquemático basado en aproximación de lente delgada (paraxial). Los tamaños del sensor y el objeto usan una escala distinta a las distancias para que sean visibles.</p>
         </Card>
       </div>
     </div>

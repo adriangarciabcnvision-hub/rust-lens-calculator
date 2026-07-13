@@ -34,5 +34,18 @@ En la pestaña **Admin → Configuración**, "Almacenamiento" mostrará
 |---|---|
 | Catálogo de cámaras y lentes | Supabase (compartido) |
 | Solicitudes de alta y su estado | Supabase (compartido) |
-| Usuarios y contraseñas | Local de cada navegador |
+| Usuarios, roles y contraseñas | Supabase (compartido) |
 | Sets guardados e historial | Local de cada navegador |
+
+**Sin Supabase, los usuarios creados en un dispositivo NO existen en los demás** — cada
+navegador tiene su propia copia local. Configurar Supabase es lo que los comparte.
+
+Nota: las contraseñas se guardan hasheadas (SHA-256+salt) en la tabla `app_users`, nunca en
+claro — aun así es un control de acceso ligero para uso interno, no un sistema de seguridad
+robusto (ver `SECURITY.md`).
+
+## Si ya tenías Supabase configurado antes de julio de 2026
+
+Si tu proyecto de Supabase es anterior a la columna `max_fps` en cámaras, vuelve a pegar y
+ejecutar `supabase-schema.sql` en el SQL Editor — es seguro repetirlo, solo añade lo que falte
+sin borrar datos existentes.

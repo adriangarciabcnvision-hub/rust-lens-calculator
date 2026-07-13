@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useDataStore } from '@/lib/dataStore';
+import { COMMON_CAMERAS, COMMON_LENSES } from '@/lib/commonCatalog';
 
 interface RequestDialogProps {
   onClose: () => void;
@@ -11,7 +12,7 @@ const inputClass =
   'w-full px-2 py-1 text-sm bg-slate-700 text-white rounded border border-slate-600 focus:border-amber-500 focus:outline-none';
 
 export function RequestDialog({ onClose }: RequestDialogProps) {
-  const addRequest = useDataStore((s) => s.addRequest);
+  const { addRequest, cameras, lenses, requests } = useDataStore();
   const [type, setType] = useState<'camera' | 'lens'>('camera');
   const [requestedBy, setRequestedBy] = useState('');
   const [sent, setSent] = useState(false);
@@ -23,6 +24,8 @@ export function RequestDialog({ onClose }: RequestDialogProps) {
   const [pixelSize, setPixelSize] = useState('');
   const [resolutionH, setResolutionH] = useState('');
   const [resolutionV, setResolutionV] = useState('');
+  const [maxFps, setMaxFps] = useState('');
+  const [readout, setReadout] = useState('');
 
   // Lente
   const [lensName, setLensName] = useState('');
@@ -31,8 +34,37 @@ export function RequestDialog({ onClose }: RequestDialogProps) {
 
   const num = (v: string) => parseFloat(v.replace(',', '.')) || 0;
 
-  const cameraValid = camName.trim() && num(sensorWidth) > 0 && num(sensorHeight) > 0 && num(pixelSize) > 0;
-  const lensValid = lensName.trim() && num(focalLength) > 0;
+  // Sugerencias para el datalist: catálogo actual + catálogo común (aunque no esté importado aún)
+  const cameraSuggestions = useMemo(
+    () => Array.from(new Set([...cameras.map((c) => c.name), ...COMMON_CAMERAS.map((c) => c.name)])).sort(),
+    [cameras]
+  );
+  const lensSuggestions = useMemo(
+    () => Array.from(new Set([...lenses.map((l) => l.name), ...COMMON_LENSES.map((l) => l.name)])).sort(),
+    [lenses]
+  );
+
+  // Bloquea duplicados sin distinguir mayúsculas: si ya existe "Basler" no se puede pedir "basler"
+  const nameClash = (name: string) => {
+    const n = name.trim().toLowerCase();
+    if (!n) return false;
+    if (type === 'camera') {
+      return (
+        cameras.some((c) => c.name.toLowerCase() === n) ||
+        requests.some((r) => r.type === 'camera' && r.status === 'pending' && r.payload?.name?.toLowerCase() === n)
+      );
+    }
+    return (
+      lenses.some((l) => l.name.toLowerCase() === n) ||
+      requests.some((r) => r.type === 'lens' && r.status === 'pending' && r.payload?.name?.toLowerCase() === n)
+    );
+  };
+
+  const camNameClash = nameClash(camName);
+  const lensNameClash = nameClash(lensName);
+
+  const cameraValid = camName.trim() && !camNameClash && num(sensorWidth) > 0 && num(sensorHeight) > 0 && num(pixelSize) > 0;
+  const lensValid = lensName.trim() && !lensNameClash && num(focalLength) > 0;
   const valid = requestedBy.trim() && (type === 'camera' ? cameraValid : lensValid);
 
   const handleSubmit = () => {
@@ -49,6 +81,8 @@ export function RequestDialog({ onClose }: RequestDialogProps) {
               pixelSize: num(pixelSize),
               resolutionH: Math.round(num(resolutionH)),
               resolutionV: Math.round(num(resolutionV)),
+              maxFps: maxFps.trim() ? num(maxFps) : undefined,
+              readout: readout.trim() ? num(readout) : undefined,
             }
           : {
               name: lensName.trim(),
@@ -106,7 +140,22 @@ export function RequestDialog({ onClose }: RequestDialogProps) {
               <>
                 <div>
                   <label className="text-xs text-slate-300">Nombre / modelo de la cámara *</label>
-                  <input type="text" value={camName} onChange={(e) => setCamName(e.target.value)} placeholder="Ej: Basler acA2440-20gm" className={inputClass} />
+                  <input
+                    type="text"
+                    list="camera-suggestions"
+                    value={camName}
+                    onChange={(e) => setCamName(e.target.value)}
+                    placeholder="Ej: Basler acA2440-20gm"
+                    className={inputClass}
+                  />
+                  <datalist id="camera-suggestions">
+                    {cameraSuggestions.map((n) => <option key={n} value={n} />)}
+                  </datalist>
+                  {camNameClash && (
+                    <p className="text-xs text-red-400 mt-1">
+                      ⚠️ Ya existe "{camName.trim()}" en el catálogo o en una solicitud pendiente. Elige el nombre exacto de la lista o revisa antes de duplicar.
+                    </p>
+                  )}
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   <div>
@@ -128,13 +177,36 @@ export function RequestDialog({ onClose }: RequestDialogProps) {
                       <input type="number" value={resolutionV} onChange={(e) => setResolutionV(e.target.value)} placeholder="V" className={inputClass} />
                     </div>
                   </div>
+                  <div>
+                    <label className="text-xs text-slate-300">Max FPS (opcional)</label>
+                    <input type="number" step="1" value={maxFps} onChange={(e) => setMaxFps(e.target.value)} placeholder="Ej: 60" className={inputClass} />
+                  </div>
+                  <div>
+                    <label className="text-xs text-slate-300">Readout (ms, opcional)</label>
+                    <input type="number" step="0.1" value={readout} onChange={(e) => setReadout(e.target.value)} placeholder="Ej: 10" className={inputClass} />
+                  </div>
                 </div>
               </>
             ) : (
               <>
                 <div>
                   <label className="text-xs text-slate-300">Nombre / modelo del lente *</label>
-                  <input type="text" value={lensName} onChange={(e) => setLensName(e.target.value)} placeholder="Ej: Computar M2514-MP2" className={inputClass} />
+                  <input
+                    type="text"
+                    list="lens-suggestions"
+                    value={lensName}
+                    onChange={(e) => setLensName(e.target.value)}
+                    placeholder="Ej: Computar M2514-MP2"
+                    className={inputClass}
+                  />
+                  <datalist id="lens-suggestions">
+                    {lensSuggestions.map((n) => <option key={n} value={n} />)}
+                  </datalist>
+                  {lensNameClash && (
+                    <p className="text-xs text-red-400 mt-1">
+                      ⚠️ Ya existe "{lensName.trim()}" en el catálogo o en una solicitud pendiente. Elige el nombre exacto de la lista o revisa antes de duplicar.
+                    </p>
+                  )}
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   <div>

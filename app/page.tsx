@@ -3,21 +3,18 @@
 import { useEffect, useState } from 'react';
 import { CalculatorTab } from '@/components/tabs/CalculatorTab';
 import { DiagnosticsTab } from '@/components/tabs/DiagnosticsTab';
-import { DepthOfFieldTab } from '@/components/tabs/DepthOfFieldTab';
 import { OpticalDiagramTab } from '@/components/tabs/OpticalDiagramTab';
-import { FrameRateTab } from '@/components/tabs/FrameRateTab';
 import { ComparatorTab } from '@/components/tabs/ComparatorTab';
 import { CodeReadabilityTab } from '@/components/tabs/CodeReadabilityTab';
 import { AdminTab } from '@/components/tabs/AdminTab';
 import { HelpModal } from '@/components/HelpModal';
 import { useDataStore } from '@/lib/dataStore';
 
+// DOF y Frame Rate viven ahora como secciones dentro de Calculadora (ver CalculatorTab)
 const TABS = [
   { id: 'calculator', label: '📊 Calculadora', component: CalculatorTab },
   { id: 'diagnostics', label: '📋 Diagnóstico', component: DiagnosticsTab },
-  { id: 'dof', label: '📐 DOF', component: DepthOfFieldTab },
   { id: 'optical', label: '🔬 Óptica', component: OpticalDiagramTab },
-  { id: 'framerate', label: '⚡ Frame Rate', component: FrameRateTab },
   { id: 'comparator', label: '🔄 Comparador', component: ComparatorTab },
   { id: 'codes', label: '📖 Códigos', component: CodeReadabilityTab },
   { id: 'admin', label: '🔐 Admin', component: AdminTab },

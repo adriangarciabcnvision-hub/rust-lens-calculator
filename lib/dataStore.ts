@@ -24,6 +24,8 @@ export interface StoredCamera {
   pixelSize: number;
   resolutionH: number;
   resolutionV: number;
+  maxFps?: number;
+  readout?: number;
 }
 
 export interface StoredLens {
@@ -53,6 +55,10 @@ export interface SavedSetParams {
   exposure: number;
   readout: number;
   velocity: number;
+  maxFps: number;
+  fNumber: number;
+  circleOfConfusion: number;
+  minimumFocusDistance: number;
 }
 
 export interface SavedSet {
@@ -71,6 +77,20 @@ const cloud = () => import('./supabaseCatalog');
 const bestEffort = (fn: () => Promise<any>) => {
   fn().catch((e) => console.warn('[Supabase] sync falló:', e?.message || e));
 };
+
+// Auto-reparación: si algún usuario llega de Supabase con contraseña en claro
+// (de antes de introducir el hash, o de una fila creada manualmente), se hashea
+// y se sube de vuelta sin esperar a que ese usuario inicie sesión.
+async function healPlaintextPasswords(users: StoredUser[]): Promise<StoredUser[]> {
+  const { isHashed, hashPassword } = await import('./passwords');
+  const toFix = users.filter((u) => !isHashed(u.password));
+  if (!toFix.length) return users;
+  const healed = await Promise.all(
+    users.map(async (u) => (isHashed(u.password) ? u : { ...u, password: await hashPassword(u.password) }))
+  );
+  bestEffort(async () => (await cloud()).upsertUsers(healed.filter((u) => toFix.some((t) => t.id === u.id))));
+  return healed;
+}
 
 interface DataState {
   users: StoredUser[];
@@ -103,7 +123,14 @@ export const useDataStore = create<DataState>()(
   persist(
     (set, get) => ({
       users: [
-        { id: 'seed-admin', username: 'admin', password: 'admin123', role: 'admin', createdAt: '2026-07-06' },
+        // Contraseña inicial "admin123" ya hasheada (nunca en claro) — ver lib/passwords.ts
+        {
+          id: 'seed-admin',
+          username: 'admin',
+          password: 'v1$ad62dcca061cd06b6db10a90ff78b3e8$1e048a7b336761421a3f0bbdc2c4e12f1be4a57e65a757e0cada3f289138738c',
+          role: 'admin',
+          createdAt: '2026-07-06',
+        },
       ],
       cameras: [],
       lenses: [],
@@ -117,7 +144,17 @@ export const useDataStore = create<DataState>()(
         try {
           const data = await mod.fetchCatalog();
           if (data) {
-            set({ cameras: data.cameras, lenses: data.lenses, requests: data.requests, cloudActive: true });
+            if (data.users === null) {
+              // Tabla app_users no creada aún: sincroniza catálogos y mantén usuarios locales
+              set({ cameras: data.cameras, lenses: data.lenses, requests: data.requests, cloudActive: true });
+            } else if (data.users.length === 0) {
+              // Primera sincronización: sube los usuarios locales (al menos el admin inicial)
+              bestEffort(() => mod.upsertUsers(get().users));
+              set({ cameras: data.cameras, lenses: data.lenses, requests: data.requests, cloudActive: true });
+            } else {
+              const healedUsers = await healPlaintextPasswords(data.users);
+              set({ users: healedUsers, cameras: data.cameras, lenses: data.lenses, requests: data.requests, cloudActive: true });
+            }
           }
         } catch (e: any) {
           console.warn('[Supabase] no se pudo sincronizar:', e?.message || e);
@@ -127,28 +164,31 @@ export const useDataStore = create<DataState>()(
 
       addUser: (user) => {
         if (get().users.some((u) => u.username === user.username)) return false;
-        set((s) => ({
-          users: [...s.users, { ...user, id: uid(), createdAt: new Date().toISOString() }],
-        }));
+        const full: StoredUser = { ...user, id: uid(), createdAt: new Date().toISOString() };
+        set((s) => ({ users: [...s.users, full] }));
+        bestEffort(async () => (await cloud()).upsertUsers([full]));
         return true;
       },
 
-      removeUser: (id) =>
-        set((s) => {
-          const target = s.users.find((u) => u.id === id);
-          // Nunca eliminar el último administrador
-          if (target?.role === 'admin' && s.users.filter((u) => u.role === 'admin').length <= 1) {
-            return s;
-          }
-          return { users: s.users.filter((u) => u.id !== id) };
-        }),
+      removeUser: (id) => {
+        const s = get();
+        const target = s.users.find((u) => u.id === id);
+        if (!target) return;
+        // Nunca eliminar el último administrador
+        if (target.role === 'admin' && s.users.filter((u) => u.role === 'admin').length <= 1) return;
+        set({ users: s.users.filter((u) => u.id !== id) });
+        bestEffort(async () => (await cloud()).deleteUserRemote(id));
+      },
 
-      updateUserPassword: (id, password) =>
+      updateUserPassword: (id, password) => {
         set((s) => ({
           users: s.users.map((u) => (u.id === id ? { ...u, password } : u)),
-        })),
+        }));
+        bestEffort(async () => (await cloud()).updateUserPasswordRemote(id, password));
+      },
 
-      // Importación por nombre: las filas nuevas sustituyen a las existentes con el mismo nombre
+      // Importación por nombre (sin distinguir mayúsculas): las filas nuevas sustituyen
+      // a las existentes con el mismo nombre, para no acabar con "Basler" y "basler" duplicados
       importCameras: (cameras) => {
         const valid = cameras.filter(
           (c) => c.name && c.sensorWidth > 0 && c.sensorHeight > 0 && c.pixelSize > 0
@@ -156,7 +196,10 @@ export const useDataStore = create<DataState>()(
         if (!valid.length) return 0;
         const withIds = valid.map((c) => ({ ...c, id: uid() }));
         set((s) => ({
-          cameras: [...s.cameras.filter((c) => !valid.some((n) => n.name === c.name)), ...withIds],
+          cameras: [
+            ...s.cameras.filter((c) => !valid.some((n) => n.name.toLowerCase() === c.name.toLowerCase())),
+            ...withIds,
+          ],
         }));
         bestEffort(async () => (await cloud()).upsertCameras(withIds));
         return valid.length;
@@ -172,7 +215,10 @@ export const useDataStore = create<DataState>()(
         if (!valid.length) return 0;
         const withIds = valid.map((l) => ({ ...l, id: uid() }));
         set((s) => ({
-          lenses: [...s.lenses.filter((l) => !valid.some((n) => n.name === l.name)), ...withIds],
+          lenses: [
+            ...s.lenses.filter((l) => !valid.some((n) => n.name.toLowerCase() === l.name.toLowerCase())),
+            ...withIds,
+          ],
         }));
         bestEffort(async () => (await cloud()).upsertLenses(withIds));
         return valid.length;

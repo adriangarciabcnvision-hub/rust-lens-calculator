@@ -70,6 +70,26 @@ export interface CalculationSnapshot {
   result_fov_vertical?: number;
   result_magnification?: number;
   result_max_fps?: number;
+  readout_ms?: number;
+  velocity_mm_s?: number;
+  target_calculation?: string;
+  result_spatial_resolution_um?: number;
+  result_motion_blur_px?: number;
+  result_motion_blur_quality?: string;
+  f_number?: number;
+  circle_of_confusion_mm?: number;
+  minimum_focus_distance_mm?: number;
+  circle_of_confusion_mode?: string;
+  result_dof_near_mm?: number;
+  result_dof_far_mm?: number;
+  result_dof_total_mm?: number;
+  motion_target?: string;
+  fps_deseado?: number;
+  fotos_per_mm?: number;
+  inspection_type?: string;
+  camera_kind?: string;
+  line_rate_hz?: number;
+  lines_per_image?: number;
   created_at?: string;
 }
 
@@ -114,7 +134,9 @@ export interface LensCalculationRequest {
 export interface MotionBlurRequest {
   velocityMmPerSec: number;
   exposureMs: number;
-  pixelSizeMm: number;
+
+  // Resolución espacial sobre el objeto
+  mmPerPixel: number;
 }
 
 export interface DepthOfFieldRequest {
@@ -152,7 +174,7 @@ export interface MotionBlurResult {
   success: boolean;
   blurPixels?: number;
   velocityPixelsPerSecond?: number;
-  qualityIndicator?: 'excellent' | 'good' | 'acceptable' | 'poor';
+  qualityIndicator?: 'excellent' | 'very_good' | 'good' | 'acceptable' | 'degraded' | 'unacceptable';
   error?: string;
 }
 
@@ -221,6 +243,7 @@ export interface CalculatorState {
   fovIsHorizontal: boolean;
   velocity: number;
   readout: number;
+  maxFps: number;
 
   // DOF specific
   fNumber: number;
@@ -242,6 +265,20 @@ export interface CalculatorState {
   // Actions
   setCamera: (camera: Camera | null) => void;
   setLens: (lens: Lens | null) => void;
+  setSensorWidth: (v: number) => void;
+  setSensorHeight: (v: number) => void;
+  setPixelSize: (v: number) => void;
+  setResolutionH: (v: number) => void;
+  setResolutionV: (v: number) => void;
+  setFocalLength: (v: number) => void;
+  setWorkingDistance: (v: number) => void;
+  setExposure: (v: number) => void;
+  setReadout: (v: number) => void;
+  setVelocity: (v: number) => void;
+  setMaxFps: (v: number) => void;
+  setFNumber: (v: number) => void;
+  setCircleOfConfusion: (v: number) => void;
+  setMinimumFocusDistance: (v: number) => void;
   setResults: (results: OpticalCalculationResult) => void;
   addToHistory: (snapshot: CalculationSnapshot) => void;
   clearHistory: () => void;

@@ -3,9 +3,15 @@
 import { useRef, useState } from 'react';
 import { Card } from '@/components/ui/Card';
 import { useDataStore, StoredCamera, StoredLens, StoredUser, ROLE_LABELS } from '@/lib/dataStore';
+import { hashPassword, verifyPassword, isHashed } from '@/lib/passwords';
+import { useSessionStore } from '@/lib/session';
+import { COMMON_CAMERAS, COMMON_LENSES } from '@/lib/commonCatalog';
+import { round } from '@/lib/calculationEngine';
 
-// Cabeceras de las plantillas Excel (se aceptan también equivalentes en inglés al importar)
-const CAMERA_HEADERS = { name: 'Nombre', sensorWidth: 'Ancho_mm', sensorHeight: 'Alto_mm', pixelSize: 'Pixel_um', resolutionH: 'ResH_px', resolutionV: 'ResV_px' };
+// Cabeceras de las plantillas Excel (se aceptan también equivalentes en inglés al importar).
+// Ancho_mm/Alto_mm/Readout_ms NO están aquí a propósito: se calculan siempre solos
+// (Res×Píxel y 1000/MaxFPS) y no se piden ni se exportan.
+const CAMERA_HEADERS = { name: 'Nombre', pixelSize: 'Pixel_um', resolutionH: 'ResH_px', resolutionV: 'ResV_px', maxFps: 'MaxFPS' };
 const LENS_HEADERS = { name: 'Nombre', focalLength: 'Focal_mm', aperture: 'Apertura' };
 
 const num = (v: any): number => {
@@ -22,7 +28,10 @@ const pick = (row: any, ...keys: string[]) => {
 
 export function AdminTab() {
   const data = useDataStore();
-  const [currentUser, setCurrentUser] = useState<StoredUser | null>(null);
+  const session = useSessionStore();
+  // La sesión persiste entre recargas; se invalida sola si el usuario se elimina o pierde el rol
+  const currentUser =
+    data.users.find((u) => u.id === session.userId && (u.role === 'admin' || u.role === 'teamleader')) || null;
   const [username, setUsername] = useState('admin');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -46,24 +55,34 @@ export function AdminTab() {
     setTimeout(() => setMessage(''), 4000);
   };
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
     setError('');
-    const user = data.users.find((u) => u.username === username && u.password === password);
-    if (user && (user.role === 'admin' || user.role === 'teamleader')) {
-      setCurrentUser(user);
-    } else if (user) {
-      setError('Este usuario no tiene acceso al panel (se requiere Administrador o Team Leader)');
-    } else {
+    const user = data.users.find((u) => u.username === username);
+    const valid = user ? await verifyPassword(password, user.password) : false;
+    if (!user || !valid) {
       setError('Usuario o contraseña incorrectos');
+      return;
+    }
+    // Migración: contraseñas antiguas en texto plano pasan a hash en el primer login
+    if (!isHashed(user.password)) {
+      data.updateUserPassword(user.id, await hashPassword(password));
+    }
+    if (user.role === 'admin' || user.role === 'teamleader') {
+      session.login(user.id);
+      if (user.username === 'admin' && password === 'admin123') {
+        notify('⚠️ Sigues usando la contraseña por defecto. Cámbiala con el botón 🔑 de tu usuario.');
+      }
+    } else {
+      setError('Este usuario no tiene acceso al panel (se requiere Administrador o Team Leader)');
     }
   };
 
-  const handleAddUser = () => {
+  const handleAddUser = async () => {
     if (!newUsername.trim() || !newPassword.trim()) {
       notify('⚠️ Usuario y contraseña son obligatorios');
       return;
     }
-    const ok = data.addUser({ username: newUsername.trim(), password: newPassword, role: newRole });
+    const ok = data.addUser({ username: newUsername.trim(), password: await hashPassword(newPassword), role: newRole });
     if (ok) {
       notify(`✓ Usuario "${newUsername.trim()}" creado`);
       setNewUsername('');
@@ -86,13 +105,12 @@ export function AdminTab() {
     const rows = data.cameras.length
       ? data.cameras.map((c) => ({
           [CAMERA_HEADERS.name]: c.name,
-          [CAMERA_HEADERS.sensorWidth]: c.sensorWidth,
-          [CAMERA_HEADERS.sensorHeight]: c.sensorHeight,
           [CAMERA_HEADERS.pixelSize]: c.pixelSize,
           [CAMERA_HEADERS.resolutionH]: c.resolutionH,
           [CAMERA_HEADERS.resolutionV]: c.resolutionV,
+          [CAMERA_HEADERS.maxFps]: c.maxFps ?? '',
         }))
-      : [{ [CAMERA_HEADERS.name]: 'Ejemplo IMX264', [CAMERA_HEADERS.sensorWidth]: 8.4, [CAMERA_HEADERS.sensorHeight]: 7.1, [CAMERA_HEADERS.pixelSize]: 3.45, [CAMERA_HEADERS.resolutionH]: 2448, [CAMERA_HEADERS.resolutionV]: 2048 }];
+      : [{ [CAMERA_HEADERS.name]: 'Ejemplo IMX264', [CAMERA_HEADERS.pixelSize]: 3.45, [CAMERA_HEADERS.resolutionH]: 2448, [CAMERA_HEADERS.resolutionV]: 2048, [CAMERA_HEADERS.maxFps]: 30 }];
     exportExcel(rows, 'Camaras', 'catalogo_camaras.xlsx');
     notify(data.cameras.length ? `✓ ${data.cameras.length} cámaras exportadas` : '✓ Plantilla de cámaras descargada');
   };
@@ -121,16 +139,29 @@ export function AdminTab() {
     if (!file) return;
     try {
       const rows = await readSheet(file);
-      const cameras: Omit<StoredCamera, 'id'>[] = rows.map((r: any) => ({
-        name: String(pick(r, 'Nombre', 'Name', 'name') ?? ''),
-        sensorWidth: num(pick(r, 'Ancho_mm', 'SensorWidth', 'sensorWidth', 'Ancho')),
-        sensorHeight: num(pick(r, 'Alto_mm', 'SensorHeight', 'sensorHeight', 'Alto')),
-        pixelSize: num(pick(r, 'Pixel_um', 'PixelSize', 'pixelSize', 'Pixel')),
-        resolutionH: num(pick(r, 'ResH_px', 'ResH', 'resolutionH')),
-        resolutionV: num(pick(r, 'ResV_px', 'ResV', 'resolutionV')),
-      }));
+      const cameras: Omit<StoredCamera, 'id'>[] = rows.map((r: any) => {
+        const pixelSize = num(pick(r, 'Pixel_um', 'PixelSize', 'pixelSize', 'Pixel'));
+        const resolutionH = num(pick(r, 'ResH_px', 'ResH', 'resolutionH'));
+        const resolutionV = num(pick(r, 'ResV_px', 'ResV', 'resolutionV'));
+        const maxFps = pick(r, 'MaxFPS', 'MaxFps', 'maxFps') ? num(pick(r, 'MaxFPS', 'MaxFps', 'maxFps')) : undefined;
+        // Ancho/Alto y Readout no hace falta indicarlos en la plantilla: se calculan
+        // siempre desde Res×Píxel y desde MaxFPS (1000/MaxFPS), igual que en la Calculadora.
+        // Si el archivo trae un Readout_ms explícito (p.ej. exportado antes), se respeta
+        // por si es un dato más preciso del datasheet que la estimación por defecto.
+        const explicitReadout = pick(r, 'Readout_ms', 'Readout', 'readout');
+        return {
+          name: String(pick(r, 'Nombre', 'Name', 'name') ?? ''),
+          sensorWidth: resolutionH > 0 && pixelSize > 0 ? round((resolutionH * pixelSize) / 1000, 2) : 0,
+          sensorHeight: resolutionV > 0 && pixelSize > 0 ? round((resolutionV * pixelSize) / 1000, 2) : 0,
+          pixelSize,
+          resolutionH,
+          resolutionV,
+          maxFps,
+          readout: explicitReadout ? num(explicitReadout) : maxFps ? round(1000 / maxFps, 3) : undefined,
+        };
+      });
       const count = data.importCameras(cameras);
-      notify(count ? `✓ ${count} cámaras importadas` : '⚠️ Ninguna fila válida (revisa las columnas: Nombre, Ancho_mm, Alto_mm, Pixel_um, ResH_px, ResV_px)');
+      notify(count ? `✓ ${count} cámaras importadas` : '⚠️ Ninguna fila válida (revisa las columnas: Nombre, Pixel_um, ResH_px, ResV_px)');
     } catch {
       notify('⚠️ No se pudo leer el archivo');
     }
@@ -200,7 +231,7 @@ export function AdminTab() {
         </h2>
         <button
           onClick={() => {
-            setCurrentUser(null);
+            session.logout();
             setPassword('');
           }}
           className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs flex-shrink-0"
@@ -237,7 +268,7 @@ export function AdminTab() {
                     </div>
                     <p className="text-slate-400">
                       {r.type === 'camera'
-                        ? `Sensor ${r.payload?.sensorWidth}×${r.payload?.sensorHeight}mm · píxel ${r.payload?.pixelSize}µm · ${r.payload?.resolutionH || '?'}×${r.payload?.resolutionV || '?'}px`
+                        ? `Sensor ${r.payload?.sensorWidth}×${r.payload?.sensorHeight}mm · píxel ${r.payload?.pixelSize}µm · ${r.payload?.resolutionH || '?'}×${r.payload?.resolutionV || '?'}px${r.payload?.maxFps ? ` · ${r.payload.maxFps}fps` : ''}${r.payload?.readout ? ` · readout ${r.payload.readout}ms` : ''}`
                         : `Focal ${r.payload?.focalLength}mm${r.payload?.aperture ? ` · ${r.payload.aperture}` : ''}`}
                     </p>
                     <div className="flex gap-2 pt-1">
@@ -307,9 +338,9 @@ export function AdminTab() {
                       placeholder="Nueva contraseña"
                       value={pwdValue}
                       onChange={(e) => setPwdValue(e.target.value)}
-                      onKeyDown={(e) => {
+                      onKeyDown={async (e) => {
                         if (e.key === 'Enter' && pwdValue.trim()) {
-                          data.updateUserPassword(u.id, pwdValue);
+                          data.updateUserPassword(u.id, await hashPassword(pwdValue));
                           setPwdEditId('');
                           notify(`✓ Contraseña de "${u.username}" actualizada`);
                         }
@@ -317,9 +348,9 @@ export function AdminTab() {
                       className="flex-1 min-w-0 px-2 py-1 bg-slate-800 text-white rounded border border-slate-600 focus:border-amber-500 focus:outline-none"
                     />
                     <button
-                      onClick={() => {
+                      onClick={async () => {
                         if (!pwdValue.trim()) return;
-                        data.updateUserPassword(u.id, pwdValue);
+                        data.updateUserPassword(u.id, await hashPassword(pwdValue));
                         setPwdEditId('');
                         notify(`✓ Contraseña de "${u.username}" actualizada`);
                       }}
@@ -377,7 +408,7 @@ export function AdminTab() {
                 <div key={c.id} className="flex items-center justify-between bg-slate-700 px-2 py-1 rounded text-xs">
                   <span>
                     <span className="font-semibold">{c.name}</span>
-                    <span className="text-slate-400"> · {c.sensorWidth}×{c.sensorHeight}mm · {c.pixelSize}µm · {c.resolutionH}×{c.resolutionV}px</span>
+                    <span className="text-slate-400"> · {c.sensorWidth}×{c.sensorHeight}mm · {c.pixelSize}µm · {c.resolutionH}×{c.resolutionV}px{c.maxFps ? ` · ${c.maxFps} fps` : ''}{c.readout ? ` · readout ${c.readout}ms` : ''}</span>
                   </span>
                   <button onClick={() => data.removeCamera(c.id)} className="px-2 py-0.5 bg-red-700 hover:bg-red-600 text-white rounded">✕</button>
                 </div>
@@ -392,6 +423,13 @@ export function AdminTab() {
               📤 {data.cameras.length ? 'Exportar Excel' : 'Descargar plantilla'}
             </button>
           </div>
+          <button
+            onClick={() => notify(`✓ ${data.importCameras(COMMON_CAMERAS)} cámaras del catálogo común importadas`)}
+            className="w-full px-3 py-1 bg-slate-700 hover:bg-amber-700 text-white rounded text-xs transition border border-dashed border-slate-600"
+            title="Modelos habituales en visión industrial (Basler, FLIR, IDS) con specs verificadas"
+          >
+            ⭐ Importar catálogo común ({COMMON_CAMERAS.length})
+          </button>
           <input
             ref={cameraFileRef}
             type="file"
@@ -399,7 +437,7 @@ export function AdminTab() {
             className="hidden"
             onChange={(e) => handleImportCameras(e.target.files?.[0])}
           />
-          <p className="text-xs text-slate-400">Columnas: Nombre, Ancho_mm, Alto_mm, Pixel_um, ResH_px, ResV_px</p>
+          <p className="text-xs text-slate-400">Columnas: Nombre, Pixel_um, ResH_px, ResV_px, MaxFPS (opcional). Ancho/Alto y Readout se calculan solos — no hace falta indicarlos (Readout_ms admite un valor manual si lo quieres sobrescribir)</p>
         </div>
       </Card>
 
@@ -426,6 +464,13 @@ export function AdminTab() {
               📤 {data.lenses.length ? 'Exportar Excel' : 'Descargar plantilla'}
             </button>
           </div>
+          <button
+            onClick={() => notify(`✓ ${data.importLenses(COMMON_LENSES)} lentes del catálogo común importados`)}
+            className="w-full px-3 py-1 bg-slate-700 hover:bg-amber-700 text-white rounded text-xs transition border border-dashed border-slate-600"
+            title="Modelos habituales en visión industrial (Computar, Fujinon, Kowa) con specs verificadas"
+          >
+            ⭐ Importar catálogo común ({COMMON_LENSES.length})
+          </button>
           <input
             ref={lensFileRef}
             type="file"

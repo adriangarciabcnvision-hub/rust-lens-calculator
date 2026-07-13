@@ -4,25 +4,28 @@ import { CalculatorState, OpticalCalculationResult, MotionBlurResult, DepthOfFie
 
 export const useCalculatorStore = create<CalculatorState>()(persist((set) => ({
   // Initial state
+  // Todo arranca vacío (0 se muestra en blanco en los inputs, ver FormInput.tsx);
+  // los cálculos se activan solos según el usuario va rellenando lo necesario.
   camera: null,
   lens: null,
-  sensorWidth: 6.4,
-  sensorHeight: 4.8,
-  pixelSize: 3.5,
-  resolution_h: 1920,
-  resolution_v: 1440,
-  exposure: 33,
-  focalLength: 50,
-  workingDistance: 1000,
+  sensorWidth: 0,
+  sensorHeight: 0,
+  pixelSize: 0,
+  resolution_h: 0,
+  resolution_v: 0,
+  exposure: 0,
+  focalLength: 0,
+  workingDistance: 0,
   fov: 0,
   fovIsHorizontal: true,
-  velocity: 100,
-  readout: 10,
+  velocity: 0,
+  readout: 0,
+  maxFps: 0,
 
   // DOF specific
-  fNumber: 2.8,
-  circleOfConfusion: 0.003,
-  minimumFocusDistance: 0.3,
+  fNumber: 0,
+  circleOfConfusion: 0,
+  minimumFocusDistance: 0,
 
   // Results
   results: null,
@@ -49,8 +52,10 @@ export const useCalculatorStore = create<CalculatorState>()(persist((set) => ({
   setExposure: (exposure) => set({ exposure }),
   setReadout: (readout) => set({ readout }),
   setVelocity: (velocity) => set({ velocity }),
+  setMaxFps: (maxFps) => set({ maxFps }),
   setFNumber: (fNumber) => set({ fNumber }),
   setCircleOfConfusion: (circleOfConfusion) => set({ circleOfConfusion }),
+  setMinimumFocusDistance: (minimumFocusDistance) => set({ minimumFocusDistance }),
 
   setResults: (results: OpticalCalculationResult) => {
     set({ results });
@@ -70,15 +75,21 @@ export const useCalculatorStore = create<CalculatorState>()(persist((set) => ({
     set({
       camera: null,
       lens: null,
-      sensorWidth: 6.4,
-      sensorHeight: 4.8,
-      pixelSize: 3.5,
-      resolution_h: 1920,
-      resolution_v: 1440,
-      exposure: 33,
-      focalLength: 50,
-      workingDistance: 1000,
+      sensorWidth: 0,
+      sensorHeight: 0,
+      pixelSize: 0,
+      resolution_h: 0,
+      resolution_v: 0,
+      exposure: 0,
+      focalLength: 0,
+      workingDistance: 0,
       fov: 0,
+      velocity: 0,
+      readout: 0,
+      maxFps: 0,
+      fNumber: 0,
+      circleOfConfusion: 0,
+      minimumFocusDistance: 0,
       results: null,
       motionBlurResults: null,
       dofResults: null,

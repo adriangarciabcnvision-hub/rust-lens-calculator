@@ -5,18 +5,54 @@ import { Card } from '@/components/ui/Card';
 import { useCalculatorStore } from '@/lib/store';
 import { useDataStore, SavedSet } from '@/lib/dataStore';
 
+interface ComparedConfig {
+  camera: string;
+  lens: string;
+  focalLength: number;
+  workingDistance: number;
+  maxFps: number;
+  results: {
+    fovHorizontalMm?: number;
+    fovVerticalMm?: number;
+    magnification?: number;
+    maxFrameRate?: number;
+    spatialResolution?: number;
+    motionBlurPixels?: number;
+  };
+}
+
+// Filas mostradas por cada configuración y usadas para calcular las diferencias
+const RESULT_ROWS: { key: keyof ComparedConfig['results']; label: string; digits: number; unit: string }[] = [
+  { key: 'fovHorizontalMm', label: 'FOV H', digits: 2, unit: 'mm' },
+  { key: 'fovVerticalMm', label: 'FOV V', digits: 2, unit: 'mm' },
+  { key: 'magnification', label: 'Magnificación', digits: 4, unit: '×' },
+  { key: 'maxFrameRate', label: 'Max FPS', digits: 1, unit: 'fps' },
+  { key: 'spatialResolution', label: 'Spatial Res', digits: 4, unit: 'mm' },
+  { key: 'motionBlurPixels', label: 'Motion Blur', digits: 2, unit: 'px' },
+];
+
 export function ComparatorTab() {
   const store = useCalculatorStore();
   const { savedSets } = useDataStore();
-  const [config1, setConfig1] = useState<any>(null);
-  const [config2, setConfig2] = useState<any>(null);
+  const [config1, setConfig1] = useState<ComparedConfig | null>(null);
+  const [config2, setConfig2] = useState<ComparedConfig | null>(null);
 
-  const configFromSet = (saved: SavedSet) => ({
+  const configFromSet = (saved: SavedSet): ComparedConfig => ({
     camera: saved.name,
     lens: `${saved.params.sensorWidth}×${saved.params.sensorHeight}mm · ${saved.params.pixelSize}µm`,
     focalLength: saved.params.focalLength,
     workingDistance: saved.params.workingDistance,
-    results: saved.results,
+    maxFps: saved.params.maxFps ?? 0,
+    results: saved.results || {},
+  });
+
+  const configFromCurrent = (): ComparedConfig => ({
+    camera: store.camera?.display_name || 'Custom',
+    lens: store.lens?.display_name || 'Custom',
+    focalLength: store.focalLength,
+    workingDistance: store.workingDistance,
+    maxFps: store.maxFps,
+    results: store.results || {},
   });
 
   const handleLoadSet = (slot: 1 | 2, id: string) => {
@@ -26,50 +62,64 @@ export function ComparatorTab() {
     else setConfig2(configFromSet(saved));
   };
 
-  const handleLoadConfig1 = () => {
-    if (store.results) {
-      setConfig1({
-        camera: store.camera?.display_name || 'Custom',
-        lens: store.lens?.display_name || 'Custom',
-        focalLength: store.focalLength,
-        workingDistance: store.workingDistance,
-        results: store.results,
-      });
-    }
-  };
-
-  const handleLoadConfig2 = () => {
-    if (store.results) {
-      setConfig2({
-        camera: store.camera?.display_name || 'Custom',
-        lens: store.lens?.display_name || 'Custom',
-        focalLength: store.focalLength,
-        workingDistance: store.workingDistance,
-        results: store.results,
-      });
-    }
-  };
-
   const handleSwap = () => {
     setConfig1(config2);
     setConfig2(config1);
   };
 
+  const renderConfigCard = (config: ComparedConfig | null, title: string, icon: string) => (
+    <Card title={title} icon={icon}>
+      {config ? (
+        <div className="space-y-1 overflow-y-auto max-h-96 text-xs">
+          <div className="flex justify-between bg-slate-700 p-1 rounded">
+            <span className="text-slate-400">Cámara:</span>
+            <span className="font-semibold">{config.camera}</span>
+          </div>
+          <div className="flex justify-between bg-slate-700 p-1 rounded">
+            <span className="text-slate-400">Lente:</span>
+            <span className="font-semibold">{config.lens}</span>
+          </div>
+          <div className="flex justify-between bg-slate-700 p-1 rounded">
+            <span className="text-slate-400">Focal:</span>
+            <span className="font-bold text-amber-400">{config.focalLength.toFixed(1)}mm</span>
+          </div>
+          <div className="flex justify-between bg-slate-700 p-1 rounded">
+            <span className="text-slate-400">WD:</span>
+            <span className="font-bold text-amber-400">{config.workingDistance.toFixed(1)}mm</span>
+          </div>
+          {RESULT_ROWS.map((row) => {
+            const v = config.results[row.key];
+            return (
+              <div key={row.key} className="flex justify-between bg-slate-700 p-1 rounded">
+                <span className="text-slate-400">{row.label}:</span>
+                <span className="font-bold text-amber-400">
+                  {v !== undefined ? `${row.unit === '×' ? '×' : ''}${v.toFixed(row.digits)}${row.unit !== '×' ? row.unit : ''}` : '—'}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <p className="text-center text-slate-400 py-2 text-xs">Sin configuración cargada</p>
+      )}
+    </Card>
+  );
+
   return (
     <div className="space-y-2 lg:h-full lg:overflow-hidden flex flex-col">
       <div className="flex flex-wrap gap-2 mb-2">
         <button
-          onClick={handleLoadConfig1}
+          onClick={() => store.results && setConfig1(configFromCurrent())}
           disabled={!store.results}
-          title="Usa el último cálculo de la pestaña Calculadora"
+          title="Usa el cálculo actual de la pestaña Calculadora"
           className="px-3 py-1 bg-amber-600 hover:bg-amber-700 disabled:bg-slate-600 text-white rounded transition text-xs"
         >
           Cálculo actual → 1
         </button>
         <button
-          onClick={handleLoadConfig2}
+          onClick={() => store.results && setConfig2(configFromCurrent())}
           disabled={!store.results}
-          title="Usa el último cálculo de la pestaña Calculadora"
+          title="Usa el cálculo actual de la pestaña Calculadora"
           className="px-3 py-1 bg-amber-600 hover:bg-amber-700 disabled:bg-slate-600 text-white rounded transition text-xs"
         >
           Cálculo actual → 2
@@ -121,90 +171,30 @@ export function ComparatorTab() {
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-2 flex-1 lg:overflow-hidden">
-        {/* Config 1 */}
-        <Card title="CONFIG 1" icon="🔴">
-          {config1 ? (
-            <div className="space-y-1 overflow-y-auto max-h-96 text-xs">
-              <div className="flex justify-between bg-slate-700 p-1 rounded">
-                <span className="text-slate-400">Cámara:</span>
-                <span className="font-semibold">{config1.camera}</span>
-              </div>
-              <div className="flex justify-between bg-slate-700 p-1 rounded">
-                <span className="text-slate-400">Lente:</span>
-                <span className="font-semibold">{config1.lens}</span>
-              </div>
-              <div className="flex justify-between bg-slate-700 p-1 rounded">
-                <span className="text-slate-400">Focal:</span>
-                <span className="font-bold text-amber-400">{config1.focalLength.toFixed(1)}mm</span>
-              </div>
-              <div className="flex justify-between bg-slate-700 p-1 rounded">
-                <span className="text-slate-400">WD:</span>
-                <span className="font-bold text-amber-400">{config1.workingDistance.toFixed(1)}mm</span>
-              </div>
-              <div className="flex justify-between bg-slate-700 p-1 rounded">
-                <span className="text-slate-400">FOV H:</span>
-                <span className="font-bold text-amber-400">{config1.results?.fovHorizontalMm.toFixed(2)}mm</span>
-              </div>
-              <div className="flex justify-between bg-slate-700 p-1 rounded">
-                <span className="text-slate-400">Mag:</span>
-                <span className="font-bold text-amber-400">×{config1.results?.magnification.toFixed(3)}</span>
-              </div>
-            </div>
-          ) : (
-            <p className="text-center text-slate-400 py-2 text-xs">Carga Config 1</p>
-          )}
-        </Card>
-
-        {/* Config 2 */}
-        <Card title="CONFIG 2" icon="🔵">
-          {config2 ? (
-            <div className="space-y-1 overflow-y-auto max-h-96 text-xs">
-              <div className="flex justify-between bg-slate-700 p-1 rounded">
-                <span className="text-slate-400">Cámara:</span>
-                <span className="font-semibold">{config2.camera}</span>
-              </div>
-              <div className="flex justify-between bg-slate-700 p-1 rounded">
-                <span className="text-slate-400">Lente:</span>
-                <span className="font-semibold">{config2.lens}</span>
-              </div>
-              <div className="flex justify-between bg-slate-700 p-1 rounded">
-                <span className="text-slate-400">Focal:</span>
-                <span className="font-bold text-amber-400">{config2.focalLength.toFixed(1)}mm</span>
-              </div>
-              <div className="flex justify-between bg-slate-700 p-1 rounded">
-                <span className="text-slate-400">WD:</span>
-                <span className="font-bold text-amber-400">{config2.workingDistance.toFixed(1)}mm</span>
-              </div>
-              <div className="flex justify-between bg-slate-700 p-1 rounded">
-                <span className="text-slate-400">FOV H:</span>
-                <span className="font-bold text-amber-400">{config2.results?.fovHorizontalMm.toFixed(2)}mm</span>
-              </div>
-              <div className="flex justify-between bg-slate-700 p-1 rounded">
-                <span className="text-slate-400">Mag:</span>
-                <span className="font-bold text-amber-400">×{config2.results?.magnification.toFixed(3)}</span>
-              </div>
-            </div>
-          ) : (
-            <p className="text-center text-slate-400 py-2 text-xs">Carga Config 2</p>
-          )}
-        </Card>
+        {renderConfigCard(config1, 'CONFIG 1', '🔴')}
+        {renderConfigCard(config2, 'CONFIG 2', '🔵')}
       </div>
 
       {config1 && config2 && (
         <Card title="Diferencias" icon="📊">
-          <div className="grid grid-cols-2 gap-2 text-xs">
-            <div className="flex justify-between bg-slate-700 p-1 rounded">
-              <span className="text-slate-400">Δ FOV H:</span>
-              <span className={`font-bold ${Math.abs((config1.results?.fovHorizontalMm || 0) - (config2.results?.fovHorizontalMm || 0)) > 5 ? 'text-red-400' : 'text-green-400'}`}>
-                {Math.abs((config1.results?.fovHorizontalMm || 0) - (config2.results?.fovHorizontalMm || 0)).toFixed(2)}mm
-              </span>
-            </div>
-            <div className="flex justify-between bg-slate-700 p-1 rounded">
-              <span className="text-slate-400">Δ Mag:</span>
-              <span className={`font-bold ${Math.abs((config1.results?.magnification || 0) - (config2.results?.magnification || 0)) > 0.01 ? 'text-red-400' : 'text-green-400'}`}>
-                ×{Math.abs((config1.results?.magnification || 0) - (config2.results?.magnification || 0)).toFixed(4)}
-              </span>
-            </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
+            {RESULT_ROWS.map((row) => {
+              const v1 = config1.results[row.key];
+              const v2 = config2.results[row.key];
+              if (v1 === undefined || v2 === undefined) return null;
+              const delta = Math.abs(v1 - v2);
+              // Umbral simple: >5% de la media se marca en rojo
+              const avg = (Math.abs(v1) + Math.abs(v2)) / 2 || 1;
+              const isBig = delta / avg > 0.05;
+              return (
+                <div key={row.key} className="flex justify-between bg-slate-700 p-1 rounded">
+                  <span className="text-slate-400">Δ {row.label}:</span>
+                  <span className={`font-bold ${isBig ? 'text-red-400' : 'text-green-400'}`}>
+                    {row.unit === '×' ? '×' : ''}{delta.toFixed(row.digits)}{row.unit !== '×' ? row.unit : ''}
+                  </span>
+                </div>
+              );
+            })}
           </div>
         </Card>
       )}

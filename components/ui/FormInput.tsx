@@ -1,6 +1,6 @@
 'use client';
 
-import { ReactNode, useState } from 'react';
+import { ReactNode, useEffect, useRef, useState } from 'react';
 
 interface FormInputProps {
   label: string;
@@ -17,6 +17,10 @@ interface FormInputProps {
   icon?: ReactNode;
   error?: string;
   disabled?: boolean;
+  /** Resalta el campo (ver dependencias) cuando el usuario pincha el título de otro parámetro relacionado */
+  highlighted?: boolean;
+  /** Si se pasa, el título es pinchable: resalta de qué depende este valor */
+  onLabelClick?: () => void;
 }
 
 export function FormInput({
@@ -34,13 +38,59 @@ export function FormInput({
   icon,
   error,
   disabled = false,
+  highlighted = false,
+  onLabelClick,
 }: FormInputProps) {
   const [showTooltip, setShowTooltip] = useState(false);
+  // Buffer local: mientras el usuario edita, se respeta literalmente lo que teclea
+  // (incluye borrar del todo, o teclear "-" / "0." a medio camino) en vez de que el
+  // valor numérico del padre lo reformatee en cada pulsación.
+  const [localText, setLocalText] = useState<string | null>(null);
+  // Recuerda el último valor que ESTE input le pidió al padre vía onChange, para poder
+  // distinguir "el padre re-renderiza con el mismo valor que le acabo de mandar" (seguimos
+  // editando, respeta el buffer) de "el valor cambió por otra vía" (cámara elegida, un
+  // Formato aplicado, otro campo relacionado que lo recalculó...) — en ese segundo caso el
+  // buffer debe soltarse, si no tapa el valor nuevo indefinidamente aunque no esté disabled.
+  const lastEmitted = useRef<number | string | null>(null);
+
+  useEffect(() => {
+    if (localText !== null && value !== lastEmitted.current) setLocalText(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]);
+
+  const handleNumberChange = (raw: string) => {
+    setLocalText(raw);
+    if (raw.trim() === '') {
+      lastEmitted.current = 0;
+      onChange(0);
+      return;
+    }
+    const parsed = parseFloat(raw);
+    if (!isNaN(parsed)) {
+      lastEmitted.current = parsed;
+      onChange(parsed);
+    }
+  };
+
+  // Un valor numérico en 0 se muestra vacío: al arrancar todo debe verse en blanco
+  const displayValue =
+    localText !== null ? localText : type === 'number' && value === 0 ? '' : value;
 
   return (
-    <div className="space-y-1">
+    <div className={`space-y-1 rounded transition ${highlighted ? 'ring-2 ring-amber-400 bg-amber-400/10 -m-1 p-1' : ''}`}>
       <div className="flex items-center gap-1 relative">
-        <label className="text-xs font-semibold text-slate-300">{label}</label>
+        {onLabelClick ? (
+          <button
+            type="button"
+            onClick={onLabelClick}
+            className="text-xs font-semibold text-slate-300 hover:text-amber-300 underline decoration-dotted underline-offset-2 transition text-left"
+            title="Ver de qué depende este valor"
+          >
+            {label}
+          </button>
+        ) : (
+          <label className="text-xs font-semibold text-slate-300">{label}</label>
+        )}
         {icon && <span className="text-slate-400">{icon}</span>}
         {tooltip && (
           <div className="relative">
@@ -80,8 +130,9 @@ export function FormInput({
         ) : (
           <input
             type={type}
-            value={value}
-            onChange={(e) => onChange(type === 'number' ? parseFloat(e.target.value) || 0 : e.target.value)}
+            value={displayValue}
+            onChange={(e) => (type === 'number' ? handleNumberChange(e.target.value) : onChange(e.target.value))}
+            onBlur={() => setLocalText(null)}
             step={step}
             min={min}
             max={max}

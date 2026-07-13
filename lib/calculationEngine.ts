@@ -37,7 +37,9 @@ const SENSOR_FORMATS: Record<string, [number, number]> = {
  *   MaxFPS = 1000 / (Exposure + Readout)
  */
 
-export function calculateLensParameters(req: LensCalculationRequest): OpticalCalculationResult {
+export function calculateLensParameters(
+  req: LensCalculationRequest
+): OpticalCalculationResult {
   try {
     const {
       sensorWidthMm,
@@ -48,82 +50,124 @@ export function calculateLensParameters(req: LensCalculationRequest): OpticalCal
       targetCalculation,
     } = req;
 
+    // -----------------------------
     // Validaciones
-    if (sensorWidthMm <= 0 || sensorHeightMm <= 0 || pixelSizeUm <= 0) {
-      return { success: false, error: 'Sensor parameters must be positive' };
+    // -----------------------------
+    if (
+      sensorWidthMm <= 0 ||
+      sensorHeightMm <= 0 ||
+      pixelSizeUm <= 0
+    ) {
+      return {
+        success: false,
+        error: "Sensor parameters must be positive",
+      };
     }
 
     let focal = focalLengthMm;
     let wd = workingDistanceMm;
-    let fovH: number;
-    let fovV: number;
 
-    // FÓRMULA CORRECTA: FOV = (SensorDim / Focal) × WD
-    if (targetCalculation === 'fieldOfView') {
-      if (focal <= 0) {
-        return { success: false, error: 'Focal length must be positive' };
-      }
-      if (wd <= 0) {
-        return { success: false, error: 'Working distance must be positive' };
-      }
-      // FOV = (SensorDim / Focal) × WorkingDistance
-      fovH = (sensorWidthMm / focal) * wd;
-      fovV = (sensorHeightMm / focal) * wd;
-    } else if (targetCalculation === 'workingDistance') {
-      if (focal <= 0) {
-        return { success: false, error: 'Focal length must be positive' };
-      }
-      // Despejando: WD = FOV × Focal / SensorWidth
-      // Este cálculo se hace en el componente
-      fovH = (sensorWidthMm / focal) * wd;
-      fovV = (sensorHeightMm / focal) * wd;
-    } else if (targetCalculation === 'focalLength') {
-      if (wd <= 0) {
-        return { success: false, error: 'Working distance must be positive' };
-      }
-      // Despejando: f = SensorWidth × WD / FOV_deseado
-      // Este cálculo se hace en el componente
-      fovH = (sensorWidthMm / focal) * wd;
-      fovV = (sensorHeightMm / focal) * wd;
-    } else {
-      fovH = (sensorWidthMm / focal) * wd;
-      fovV = (sensorHeightMm / focal) * wd;
+    if (focal <= 0) {
+      return {
+        success: false,
+        error: "Focal length must be positive",
+      };
     }
 
-    // Magnification = Focal / WorkingDistance
-    const magnification = wd > 0 ? focal / wd : 0;
+    if (wd <= 0) {
+      return {
+        success: false,
+        error: "Working distance must be positive",
+      };
+    }
 
-    // Frame rate máximo = 1000 / (Exposure + Readout)
-    const exposure = req.exposureMs || 33;
-    const readout = req.readoutMs || 10;
-    const maxFrameRate = 1000 / (exposure + readout);
+    // -----------------------------
+    // FOV
+    // Aproximación industrial
+    // -----------------------------
 
-    // Resolución espacial: el tamaño físico de un píxel en mm
-    const pixelSizeMm = pixelSizeUm / 1000;
+    const fovH = (sensorWidthMm * wd) / focal;
+    const fovV = (sensorHeightMm * wd) / focal;
 
-    // Resolución del sensor (en megapixeles aproximado)
-    const resolutionH = Math.round((sensorWidthMm / pixelSizeMm) * 100) / 100;
-    const resolutionV = Math.round((sensorHeightMm / pixelSizeMm) * 100) / 100;
-    const megapixels = (resolutionH * resolutionV) / 1000000;
+    // -----------------------------
+    // Magnificación
+    // M = Sensor / FOV
+    // -----------------------------
+
+    const magnification = sensorWidthMm / fovH;
+
+    // -----------------------------
+    // Pixel físico del sensor
+    // -----------------------------
+
+    const sensorPixelSizeMm = pixelSizeUm / 1000;
+
+    // -----------------------------
+    // Resolución del sensor
+    // -----------------------------
+
+    const resolutionH = Math.round(
+      (sensorWidthMm * 1000) / pixelSizeUm
+    );
+
+    const resolutionV = Math.round(
+      (sensorHeightMm * 1000) / pixelSizeUm
+    );
+
+    const megapixels =
+      (resolutionH * resolutionV) / 1_000_000;
+
+    // -----------------------------
+    // Resolución espacial
+    // (sobre el objeto)
+    // -----------------------------
+
+    const mmPerPixel = fovH / resolutionH;
+
+    // -----------------------------
+    // FPS teórico
+    // -----------------------------
+
+    const exposure = req.exposureMs ?? 33;
+    const readout = req.readoutMs ?? 10;
+
+    const maxFrameRate =
+      1000 / (exposure + readout);
 
     return {
       success: true,
+
       focalLengthMm: round(focal, 3),
+
       workingDistanceMm: round(wd, 2),
+
       fovHorizontalMm: round(fovH, 2),
+
       fovVerticalMm: round(fovV, 2),
+
       magnification: round(magnification, 4),
+
       maxFrameRate: round(maxFrameRate, 1),
-      pixelHorizontal: round(pixelSizeMm, 4),
-      pixelVertical: round(pixelSizeMm, 4),
+
+      pixelHorizontal: round(sensorPixelSizeMm, 4),
+
+      pixelVertical: round(sensorPixelSizeMm, 4),
+
       megapixels: round(megapixels, 2),
-      spatialResolution: pixelSizeMm,
-      motionBlurPixels: 0, // Se calcula en calculateMotionBlur
+
+      // IMPORTANTE:
+      // Ahora representa realmente mm/pixel
+      spatialResolution: round(mmPerPixel, 6),
+
+      motionBlurPixels: 0,
     };
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Unknown error',
+      error:
+        error instanceof Error
+          ? error.message
+          : "Unknown error",
     };
   }
 }
@@ -142,12 +186,29 @@ export function calculateLensParameters(req: LensCalculationRequest): OpticalCal
  *   - VelocityPx/s = 100 / 0.0035 = 28,571 px/s
  *   - Blur = (28,571 × 10) / 1000 = 285.7 píxeles
  */
-export function calculateMotionBlur(req: MotionBlurRequest): MotionBlurResult {
+export function calculateMotionBlur(
+  req: MotionBlurRequest
+): MotionBlurResult {
   try {
-    const { velocityMmPerSec, exposureMs, pixelSizeMm } = req;
+    const {
+      velocityMmPerSec,
+      exposureMs,
+      mmPerPixel,
+    } = req;
 
-    if (pixelSizeMm <= 0) {
-      return { success: false, error: 'Pixel size must be positive' };
+    // Validaciones
+    if (mmPerPixel <= 0) {
+      return {
+        success: false,
+        error: "Spatial resolution (mm/pixel) must be positive",
+      };
+    }
+
+    if (exposureMs < 0) {
+      return {
+        success: false,
+        error: "Exposure must be positive",
+      };
     }
 
     if (velocityMmPerSec <= 0) {
@@ -155,33 +216,37 @@ export function calculateMotionBlur(req: MotionBlurRequest): MotionBlurResult {
         success: true,
         blurPixels: 0,
         velocityPixelsPerSecond: 0,
-        qualityIndicator: 'excellent',
+        qualityIndicator: "excellent",
       };
     }
 
-    // Velocidad en píxeles/segundo
-    const velocityPixelsPerSec = velocityMmPerSec / pixelSizeMm;
+    // Conversión de velocidad a píxeles/segundo
+    const velocityPixelsPerSecond =
+      velocityMmPerSec / mmPerPixel;
 
-    // Blur en píxeles = (velocidad_px/s × exposición_ms) / 1000
-    const blurPixels = (velocityPixelsPerSec * exposureMs) / 1000;
+    // Motion Blur
+    const blurPixels =
+      (velocityPixelsPerSecond * exposureMs) / 1000;
 
-    // Indicador de calidad basado en píxeles de desenfoque
-    let qualityIndicator: 'excellent' | 'good' | 'acceptable' | 'poor';
-    if (blurPixels < 0.1) qualityIndicator = 'excellent';
-    else if (blurPixels < 0.5) qualityIndicator = 'good';
-    else if (blurPixels < 1.0) qualityIndicator = 'acceptable';
-    else qualityIndicator = 'poor';
+    const qualityIndicator =
+      classifyMotionBlur(blurPixels);
 
     return {
       success: true,
       blurPixels: round(blurPixels, 2),
-      velocityPixelsPerSecond: round(velocityPixelsPerSec, 2),
+      velocityPixelsPerSecond: round(
+        velocityPixelsPerSecond,
+        2
+      ),
       qualityIndicator,
     };
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Unknown error',
+      error:
+        error instanceof Error
+          ? error.message
+          : "Unknown error",
     };
   }
 }
@@ -307,6 +372,51 @@ export function calculateCodeReadability(req: CodeReadabilityRequest): CodeReada
 export function getSensorDimensions(format: string): [number, number] {
   return SENSOR_FORMATS[format] || [0, 0];
 }
+
+/**
+ * Clasificación de motion blur (guía habitual en visión industrial):
+ *   < 0.25 px  Excelente
+ *   0.25–0.5   Muy bueno
+ *   0.5–1      Bueno
+ *   1–2        Aceptable según la aplicación
+ *   2–5        Empieza a degradar
+ *   > 5        Normalmente inaceptable
+ */
+export type MotionBlurQuality = 'excellent' | 'very_good' | 'good' | 'acceptable' | 'degraded' | 'unacceptable';
+
+export function classifyMotionBlur(blurPixels: number): MotionBlurQuality {
+  if (blurPixels < 0.25) return 'excellent';
+  if (blurPixels < 0.5) return 'very_good';
+  if (blurPixels < 1) return 'good';
+  if (blurPixels < 2) return 'acceptable';
+  if (blurPixels <= 5) return 'degraded';
+  return 'unacceptable';
+}
+
+export const MOTION_BLUR_QUALITY_LABELS: Record<MotionBlurQuality, string> = {
+  excellent: 'Excelente',
+  very_good: 'Muy bueno',
+  good: 'Bueno',
+  acceptable: 'Aceptable según la aplicación',
+  degraded: 'Empieza a degradar',
+  unacceptable: 'Normalmente inaceptable',
+};
+
+// Umbral máximo de motion blur (px) recomendado según el tipo de inspección
+export type InspectionType = 'metrology' | 'dimensional' | 'presence' | 'undefined';
+
+export const INSPECTION_BLUR_THRESHOLDS: Record<Exclude<InspectionType, 'undefined'>, number> = {
+  metrology: 0.5,
+  dimensional: 1,
+  presence: 2,
+};
+
+export const INSPECTION_TYPE_LABELS: Record<InspectionType, string> = {
+  metrology: 'Metrología muy precisa',
+  dimensional: 'Inspección dimensional',
+  presence: 'Presencia/ausencia, OCR sencillo',
+  undefined: 'No definida',
+};
 
 export function round(value: number, decimals: number): number {
   return Math.round(value * Math.pow(10, decimals)) / Math.pow(10, decimals);
