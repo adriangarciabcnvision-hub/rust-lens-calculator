@@ -41,11 +41,36 @@ export async function fetchCatalog(): Promise<{ cameras: StoredCamera[]; lenses:
           id: u.id, username: u.username, password: u.password, role: u.role, createdAt: u.created_at,
         })),
     cameras: cams.data.map((c: any) => ({
-      id: c.id, name: c.name, sensorWidth: Number(c.sensor_width), sensorHeight: Number(c.sensor_height),
-      pixelSize: Number(c.pixel_size), resolutionH: c.resolution_h, resolutionV: c.resolution_v,
-      maxFps: c.max_fps !== undefined && c.max_fps !== null ? Number(c.max_fps) : undefined,
-      readout: c.readout !== undefined && c.readout !== null ? Number(c.readout) : undefined,
-    })),
+  id: c.id,
+
+  manufacturer: c.manufacturer ?? undefined,
+  model: c.model ?? undefined,
+  name: c.model ?? c.name,
+
+  sensor: c.sensor ?? undefined,
+
+  interface: c.interface ?? undefined,
+  shutter: c.shutter ?? undefined,
+  color: c.color ?? undefined,
+
+  sensorWidth: Number(c.sensor_width),
+  sensorHeight: Number(c.sensor_height),
+
+  pixelSize: Number(c.pixel_size),
+
+  resolutionH: Number(c.resolution_h),
+  resolutionV: Number(c.resolution_v),
+
+  maxFps:
+    c.max_fps != null
+      ? Number(c.max_fps)
+      : undefined,
+
+  readout:
+    c.readout != null
+      ? Number(c.readout)
+      : undefined,
+})),
     lenses: lens.data.map((l: any) => ({
       id: l.id, name: l.name, focalLength: Number(l.focal_length), aperture: l.aperture || undefined,
     })),
@@ -61,10 +86,26 @@ export async function upsertCameras(cameras: StoredCamera[]) {
   if (!supabase) return;
   const { error } = await supabase.from('cameras').upsert(
     cameras.map((c) => ({
-      id: c.id, name: c.name, sensor_width: c.sensorWidth, sensor_height: c.sensorHeight,
-      pixel_size: c.pixelSize, resolution_h: c.resolutionH, resolution_v: c.resolutionV,
-      max_fps: c.maxFps ?? null, readout: c.readout ?? null,
-    })),
+    id: c.id,
+    manufacturer: c.manufacturer,
+    model: c.model,
+    name: c.name,
+    sensor: c.sensor,
+
+    sensor_width: c.sensorWidth,
+    sensor_height: c.sensorHeight,
+    pixel_size: c.pixelSize,
+
+    resolution_h: c.resolutionH,
+    resolution_v: c.resolutionV,
+
+    max_fps: c.maxFps,
+    readout: c.readout,
+
+    interface: c.interface,
+    shutter: c.shutter,
+    color: c.color
+})),
     { onConflict: 'name' }
   );
   if (error) throw new Error(error.message);
