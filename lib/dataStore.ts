@@ -40,12 +40,14 @@ export interface StoredCamera {
 }
 
 export interface StoredLens {
+
   id: string;
 
-    name: string;               // ← seguir usándolo
-
   manufacturer?: string;
-  model: string;
+
+  model?: string;
+
+  name: string;
 
   focalLength: number;
 
@@ -55,7 +57,14 @@ export interface StoredLens {
 
   maxSensor?: string;
 
-  telecentric?: boolean;
+  telecentric?: string;
+
+  workingDistanceMin?: number;
+
+  workingDistanceMax?: number;
+
+  sourceUrl?: string;
+
 }
 
 export interface CatalogRequest {

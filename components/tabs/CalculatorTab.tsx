@@ -7,6 +7,8 @@ import { useCalculatorStore } from '@/lib/store';
 import { useDataStore, SavedSet } from '@/lib/dataStore';
 import { RequestDialog } from '@/components/RequestDialog';
 import { openPrintableReport } from '@/lib/printReport';
+import CameraSelector from '@/components/CameraSelector';
+import LensSelector from '@/components/LensSelector';
 import {
   calculateMotionBlur,
   calculateDepthOfField,
@@ -594,18 +596,10 @@ store.setResults({
         {/* SENSOR SECTION */}
         <Card title="Sensor" icon="📊" className="p-2">
           <div className="flex gap-2 mb-2">
-            <select
-              value={selectedCameraId}
-              onChange={(e) => handleSelectCamera(e.target.value)}
-              className="flex-1 min-w-0 px-2 py-1 text-sm bg-slate-700 text-amber-300 rounded border border-amber-700/50 focus:border-amber-500 focus:outline-none"
-            >
-              <option value="">
-                {dataStore.cameras.length ? '📷 Cámara del catálogo…' : '📷 Catálogo de cámaras vacío (impórtalo en Admin)'}
-              </option>
-              {dataStore.cameras.map((c) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
+           <CameraSelector
+                value={selectedCameraId}
+                onChange={handleSelectCamera}
+            />
             <button
               onClick={() => setShowRequestDialog(true)}
               title="Solicitar añadir una cámara o lente al catálogo"
@@ -791,18 +785,10 @@ store.setResults({
 
         {/* DEPTH OF FIELD */}
         <Card title="Profundidad de Campo (DOF)" icon="📐" className="p-2">
-          <select
+         <LensSelector
             value={selectedLensId}
-            onChange={(e) => handleSelectLens(e.target.value)}
-            className="w-full mb-2 px-2 py-1 text-sm bg-slate-700 text-amber-300 rounded border border-amber-700/50 focus:border-amber-500 focus:outline-none"
-          >
-            <option value="">
-              {dataStore.lenses.length ? '🔭 Lente del catálogo…' : '🔭 Catálogo de lentes vacío (impórtalo en Admin)'}
-            </option>
-            {dataStore.lenses.map((l) => (
-              <option key={l.id} value={l.id}>{l.name} ({l.focalLength}mm{l.aperture ? `, ${l.aperture}` : ''})</option>
-            ))}
-          </select>
+            onChange={handleSelectLens}
+        />
           <div className="grid grid-cols-2 gap-2">
             <FormInput
               label="Número f"

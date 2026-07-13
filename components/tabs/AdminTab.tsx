@@ -242,126 +242,22 @@ const handleExportLenses = () => {
     if (cameraFileRef.current) cameraFileRef.current.value = '';
   };
 
-const handleImportLenses = async (file: File | undefined) => {
-
-  if (!file) return;
-
-  try {
-
-    const rows = await readSheet(file);
-
-    const lenses: Omit<StoredLens, 'id'>[] =
-      rows.map((r: any) => {
-
-        const manufacturer = String(
-          pick(r, 'Manufacturer', 'manufacturer') ?? ''
-        ).trim();
-
-        const model = String(
-          pick(
-            r,
-            'Model',
-            'model',
-            'Nombre',
-            'Name',
-            'name'
-          ) ?? ''
-        ).trim();
-
-        const aperture = String(
-          pick(
-            r,
-            'Aperture',
-            'aperture',
-            'Apertura'
-          ) ?? ''
-        ).trim();
-
-        const mount = String(
-          pick(
-            r,
-            'Mount',
-            'mount'
-          ) ?? ''
-        ).trim();
-
-        const maxSensor = String(
-          pick(
-            r,
-            'MaxSensor',
-            'maxSensor'
-          ) ?? ''
-        ).trim();
-
-        const telecentricText = String(
-          pick(
-            r,
-            'Telecentric',
-            'telecentric'
-          ) ?? ''
-        ).trim().toLowerCase();
-
-        return {
-
-          // Compatibilidad
-          name:
-            manufacturer && model
-              ? `${manufacturer} ${model}`
-              : model,
-
-          manufacturer,
-
-          model,
-
-          focalLength: num(
-            pick(
-              r,
-              'Focal_mm',
-              'FocalLength',
-              'focalLength',
-              'Focal'
-            )
-          ),
-
-          aperture: aperture || undefined,
-
-          mount: mount || undefined,
-
-          maxSensor: maxSensor || undefined,
-
-          telecentric:
-            telecentricText === ''
-              ? undefined
-              : telecentricText === 'yes' ||
-                telecentricText === 'true' ||
-                telecentricText === 'si' ||
-                telecentricText === 'sí',
-        };
-
-      });
-
-    const count =
-      data.importLenses(lenses);
-
-    notify(
-      count
-        ? `✓ ${count} lentes importados`
-        : '⚠️ Ninguna lente válida encontrada'
-    );
-
-  }
-  catch {
-
-    notify(
-      '⚠️ No se pudo leer el archivo'
-    );
-
-  }
-
-  if (lensFileRef.current)
-    lensFileRef.current.value = '';
-
-};
+  const handleImportLenses = async (file: File | undefined) => {
+    if (!file) return;
+    try {
+      const rows = await readSheet(file);
+      const lenses: Omit<StoredLens, 'id'>[] = rows.map((r: any) => ({
+        name: String(pick(r, 'Nombre', 'Name', 'name') ?? ''),
+        focalLength: num(pick(r, 'Focal_mm', 'FocalLength', 'focalLength', 'Focal')),
+        aperture: pick(r, 'Apertura', 'Aperture', 'aperture') ? String(pick(r, 'Apertura', 'Aperture', 'aperture')) : undefined,
+      }));
+      const count = data.importLenses(lenses);
+      notify(count ? `✓ ${count} lentes importados` : '⚠️ Ninguna fila válida (revisa las columnas: Nombre, Focal_mm, Apertura)');
+    } catch {
+      notify('⚠️ No se pudo leer el archivo');
+    }
+    if (lensFileRef.current) lensFileRef.current.value = '';
+  };
 
   if (!currentUser) {
     return (
