@@ -9,6 +9,7 @@ import { RequestDialog } from '@/components/RequestDialog';
 import { openPrintableReport } from '@/lib/printReport';
 import CameraSelector from '@/components/CameraSelector';
 import LensSelector from '@/components/LensSelector';
+import Dialog from '@/components/ui/Dialog';
 import {
   calculateMotionBlur,
   calculateDepthOfField,
@@ -18,6 +19,8 @@ import {
   INSPECTION_TYPE_LABELS,
   InspectionType,
 } from '@/lib/calculationEngine';
+
+
 
 const SENSOR_FORMATS = {
   '1/3"': [4.8, 3.6],
@@ -54,6 +57,8 @@ export function CalculatorTab() {
   const [showRequestDialog, setShowRequestDialog] = useState(false);
   const [diagnosticMsg, setDiagnosticMsg] = useState('');
   const [activeDepKey, setActiveDepKey] = useState<string | null>(null);
+const [cameraDialog,setCameraDialog]=useState(false);
+const [lensDialog,setLensDialog]=useState(false);
 
   // Motion Blur / Frame Rate: qué campo se calcula de los 4 (FPS/Exposición/Velocidad/Fotos-mm)
   const [motionTarget, setMotionTarget] = useState<'exposure' | 'fps' | 'velocity' | 'fotosPerMm'>('exposure');
@@ -572,7 +577,9 @@ store.setResults({
     store.setResults(saved.results);
   };
 
-  return (
+
+return (
+<>
     <div className="flex flex-col gap-2 lg:h-full lg:overflow-hidden">
       {/* TIPO DE INSPECCIÓN: al inicio de todo — fija a la vez el Círculo de Confusión (DOF) y el umbral de Motion Blur */}
       <Card title="Tipo de Inspección" icon="🎯" className="p-2 flex-shrink-0">
@@ -590,16 +597,26 @@ store.setResults({
       </Card>
 
     <div className="grid grid-cols-1 lg:grid-cols-6 gap-3 lg:flex-1 lg:overflow-hidden">
-      {/* LEFT PANEL - INPUTS */}
-      <div className="lg:col-span-3 flex flex-col lg:h-full lg:overflow-hidden">
-      <div className="space-y-2 lg:flex-1 lg:overflow-y-auto lg:pr-2">
-        {/* SENSOR SECTION */}
-        <Card title="Sensor" icon="📊" className="p-2">
-          <div className="flex gap-2 mb-2">
-           <CameraSelector
-                value={selectedCameraId}
-                onChange={handleSelectCamera}
-            />
+                {/* LEFT PANEL - INPUTS */}
+                <div className="lg:col-span-3 flex flex-col lg:h-full lg:overflow-hidden">
+                <div className="space-y-2 lg:flex-1 lg:overflow-y-auto lg:pr-2">
+                  {/* SENSOR SECTION */}
+                  <Card title="Sensor" icon="📊" className="p-2">
+                    <div className="flex gap-2 mb-2">
+                    <div className="flex gap-2">
+
+              <button
+                  onClick={()=>setCameraDialog(true)}
+                  className="flex-1 bg-slate-700 hover:bg-slate-600 rounded px-3 py-2 text-left"
+              >
+
+                  {store.camera?.display_name
+                      ? `📷 ${store.camera.display_name}`
+                      : 'Seleccionar cámara'}
+
+              </button>
+
+          </div>
             <button
               onClick={() => setShowRequestDialog(true)}
               title="Solicitar añadir una cámara o lente al catálogo"
@@ -785,10 +802,14 @@ store.setResults({
 
         {/* DEPTH OF FIELD */}
         <Card title="Profundidad de Campo (DOF)" icon="📐" className="p-2">
-         <LensSelector
-            value={selectedLensId}
-            onChange={handleSelectLens}
-        />
+        <button
+            onClick={() => setLensDialog(true)}
+            className="w-full bg-slate-700 hover:bg-slate-600 rounded px-3 py-2 text-left"
+        >
+            {store.lens?.display_name
+                ? `🔭 ${store.lens.display_name}`
+                : 'Seleccionar lente'}
+        </button>
           <div className="grid grid-cols-2 gap-2">
             <FormInput
               label="Número f"
@@ -1195,5 +1216,39 @@ store.setResults({
       {showRequestDialog && <RequestDialog onClose={() => setShowRequestDialog(false)} />}
     </div>
     </div>
+
+    <Dialog
+        open={cameraDialog}
+        onClose={() => setCameraDialog(false)}
+        title="Seleccionar cámara"
+    >
+        <CameraSelector
+            value={selectedCameraId}
+            onChange={(id) => {
+                handleSelectCamera(id);
+                setCameraDialog(false);
+            }}
+        />
+    </Dialog>
+    
+    <Dialog
+    open={lensDialog}
+    onClose={() => setLensDialog(false)}
+    title="Seleccionar lente"
+>
+    <LensSelector
+        value={selectedLensId}
+        onChange={(id) => {
+            handleSelectLens(id);
+            setLensDialog(false);
+        }}
+    />
+</Dialog>
+
+</>
+
   );
+  
 }
+
+
