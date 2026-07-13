@@ -185,13 +185,12 @@ export function CalculatorTab() {
 const motionBlur =
 useMemo(()=>{
 
-    const fovH =
-    (store.sensorWidth/store.focalLength)
-    *store.workingDistance;
-
-    const mmPerPixel =
-    fovH/store.resolution_h;
-
+const mmPerPixel =
+    store.results?.spatialResolution ??
+    (
+      ((store.sensorWidth/store.focalLength)*store.workingDistance)
+      / store.resolution_h
+    );
     return calculateMotionBlur({
 
         velocityMmPerSec:
@@ -219,20 +218,24 @@ useMemo(()=>{
     if (store.focalLength <= 0 || store.workingDistance <= 0) return;
     const fovH = (store.sensorWidth / store.focalLength) * store.workingDistance;
     const fovV = (store.sensorHeight / store.focalLength) * store.workingDistance;
-    const mmPerPixel =
-fovH /
-store.resolution_h;
-spatialResolution:
-round(mmPerPixel,6),
-    store.setResults({
-      success: true,
-      fovHorizontalMm: round(fovH, 2),
-      fovVerticalMm: round(fovV, 2),
-      magnification: round(store.focalLength / store.workingDistance, 4),
-      maxFrameRate: round(store.maxFps, 1),
-      spatialResolution: store.pixelSize / 1000,
-      motionBlurPixels: motionBlur.blurPixels,
-    });
+    const magnification = store.sensorWidth / fovH;
+
+const mmPerPixel = fovH / store.resolution_h;
+
+store.setResults({
+  success: true,
+
+  fovHorizontalMm: round(fovH, 2),
+  fovVerticalMm: round(fovV, 2),
+
+  magnification: round(magnification, 4),
+
+  maxFrameRate: round(store.maxFps, 1),
+
+  spatialResolution: round(mmPerPixel, 6),
+
+  motionBlurPixels: motionBlur.blurPixels,
+});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isFieldOfViewTarget, store.sensorWidth, store.sensorHeight, store.pixelSize, store.focalLength, store.workingDistance, store.maxFps, motionBlur.blurPixels]);
 
@@ -242,17 +245,30 @@ round(mmPerPixel,6),
     if (store.sensorWidth <= 0 || store.focalLength <= 0 || desiredFovX <= 0) return;
     const calculatedWd = (desiredFovX * store.focalLength) / store.sensorWidth;
     const fovV = (store.sensorHeight / store.focalLength) * calculatedWd;
+    const magnification =
+    store.sensorWidth / desiredFovX;
+
+const mmPerPixel =
+    desiredFovX / store.resolution_h;
+
+
     store.setWorkingDistance(round(calculatedWd, 2));
-    store.setResults({
-      success: true,
-      fovHorizontalMm: round(desiredFovX, 2),
-      fovVerticalMm: round(fovV, 2),
-      magnification: round(store.focalLength / calculatedWd, 4),
-      maxFrameRate: round(store.maxFps, 1),
-      spatialResolution: store.pixelSize / 1000,
-      motionBlurPixels: motionBlur.blurPixels,
-      workingDistanceMm: round(calculatedWd, 2),
-    });
+   store.setResults({
+    success: true,
+
+    fovHorizontalMm: round(desiredFovX,2),
+    fovVerticalMm: round(fovV,2),
+
+    magnification: round(magnification,4),
+
+    maxFrameRate: round(store.maxFps,1),
+
+    spatialResolution: round(mmPerPixel,6),
+
+    motionBlurPixels: motionBlur.blurPixels,
+
+    workingDistanceMm: round(calculatedWd,2),
+});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isWorkingDistanceTarget, desiredFovX, store.focalLength, store.sensorWidth, store.sensorHeight, store.maxFps, motionBlur.blurPixels]);
 
@@ -262,17 +278,31 @@ round(mmPerPixel,6),
     if (store.sensorWidth <= 0 || store.workingDistance <= 0 || desiredFovX <= 0) return;
     const calculatedFocal = (store.sensorWidth * store.workingDistance) / desiredFovX;
     const fovV = (store.sensorHeight / calculatedFocal) * store.workingDistance;
+    const magnification =
+    store.sensorWidth / desiredFovX;
+
+const mmPerPixel =
+    desiredFovX / store.resolution_h;
     store.setFocalLength(round(calculatedFocal, 2));
-    store.setResults({
-      success: true,
-      fovHorizontalMm: round(desiredFovX, 2),
-      fovVerticalMm: round(fovV, 2),
-      magnification: round(calculatedFocal / store.workingDistance, 4),
-      maxFrameRate: round(store.maxFps, 1),
-      spatialResolution: store.pixelSize / 1000,
-      motionBlurPixels: motionBlur.blurPixels,
-      focalLengthMm: round(calculatedFocal, 2),
-    });
+store.setResults({
+
+    success:true,
+
+    fovHorizontalMm: round(desiredFovX,2),
+
+    fovVerticalMm: round(fovV,2),
+
+    magnification: round(magnification,4),
+
+    maxFrameRate: round(store.maxFps,1),
+
+    spatialResolution: round(mmPerPixel,6),
+
+    motionBlurPixels: motionBlur.blurPixels,
+
+    focalLengthMm: round(calculatedFocal,2),
+
+});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isFocalLengthTarget, desiredFovX, store.workingDistance, store.sensorWidth, store.sensorHeight, store.maxFps, motionBlur.blurPixels]);
 
@@ -396,7 +426,7 @@ round(mmPerPixel,6),
       result_fov_vertical: store.results.fovVerticalMm,
       result_magnification: store.results.magnification,
       result_max_fps: store.maxFps,
-      result_spatial_resolution_um: store.pixelSize,
+      result_spatial_resolution_um:store.results?.spatialResolution,
       result_motion_blur_px: motionBlur.blurPixels,
       result_motion_blur_quality: motionBlur.qualityIndicator ? MOTION_BLUR_QUALITY_LABELS[motionBlur.qualityIndicator] : undefined,
       f_number: store.fNumber,
@@ -1065,10 +1095,12 @@ round(mmPerPixel,6),
                   <p className="text-blue-400 font-bold text-lg">{store.maxFps?.toFixed(1)}</p>
                 </div>
                 <div className="bg-purple-900/30 border border-purple-700 p-2 rounded">
-                  <p className="text-purple-300 text-xs">Spatial Res</p>
-                  <p className="text-purple-400 font-bold text-lg">{store.pixelSize?.toFixed(3)}</p>
-                  <p className="text-purple-300 text-xs">µm</p>
-                </div>
+                    <p className="text-purple-300 text-xs">Spatial Resolution</p>
+                    <p className="text-purple-400 font-bold text-lg">
+                      {store.results?.spatialResolution?.toFixed(4)}
+                    </p>
+                    <p className="text-purple-300 text-xs">mm/px</p>
+                  </div>
                 <div className={`bg-orange-900/30 border border-orange-700 p-2 rounded ${isHighlighted('motionBlur') ? 'ring-2 ring-amber-400' : ''}`}>
                   <button type="button" onClick={() => handleLabelClick('motionBlur')} className="text-orange-300 text-xs hover:text-amber-300 underline decoration-dotted underline-offset-2">Motion Blur</button>
                   <p className="text-orange-400 font-bold text-lg">{motionBlur.blurPixels?.toFixed(2)}</p>
