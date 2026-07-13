@@ -209,38 +209,123 @@ const handleExportLenses = () => {
     return XLSX.utils.sheet_to_json(ws);
   };
 
-  const handleImportCameras = async (file: File | undefined) => {
-    if (!file) return;
-    try {
-      const rows = await readSheet(file);
-      const cameras: Omit<StoredCamera, 'id'>[] = rows.map((r: any) => {
-        const pixelSize = num(pick(r, 'Pixel_um', 'PixelSize', 'pixelSize', 'Pixel'));
-        const resolutionH = num(pick(r, 'ResH_px', 'ResH', 'resolutionH'));
-        const resolutionV = num(pick(r, 'ResV_px', 'ResV', 'resolutionV'));
-        const maxFps = pick(r, 'MaxFPS', 'MaxFps', 'maxFps') ? num(pick(r, 'MaxFPS', 'MaxFps', 'maxFps')) : undefined;
-        // Ancho/Alto y Readout no hace falta indicarlos en la plantilla: se calculan
-        // siempre desde Res×Píxel y desde MaxFPS (1000/MaxFPS), igual que en la Calculadora.
-        // Si el archivo trae un Readout_ms explícito (p.ej. exportado antes), se respeta
-        // por si es un dato más preciso del datasheet que la estimación por defecto.
-        const explicitReadout = pick(r, 'Readout_ms', 'Readout', 'readout');
-        return {
-          name: String(pick(r, 'Nombre', 'Name', 'name') ?? ''),
-          sensorWidth: resolutionH > 0 && pixelSize > 0 ? round((resolutionH * pixelSize) / 1000, 2) : 0,
-          sensorHeight: resolutionV > 0 && pixelSize > 0 ? round((resolutionV * pixelSize) / 1000, 2) : 0,
-          pixelSize,
-          resolutionH,
-          resolutionV,
-          maxFps,
-          readout: explicitReadout ? num(explicitReadout) : maxFps ? round(1000 / maxFps, 3) : undefined,
-        };
-      });
-      const count = data.importCameras(cameras);
-      notify(count ? `✓ ${count} cámaras importadas` : '⚠️ Ninguna fila válida (revisa las columnas: Nombre, Pixel_um, ResH_px, ResV_px)');
-    } catch {
-      notify('⚠️ No se pudo leer el archivo');
-    }
-    if (cameraFileRef.current) cameraFileRef.current.value = '';
-  };
+const handleImportCameras = async (file: File | undefined) => {
+  if (!file) return;
+
+  try {
+
+    const rows = await readSheet(file);
+
+    const cameras: Omit<StoredCamera, 'id'>[] = rows.map((r: any) => {
+
+      const pixelSize = num(
+        pick(r, 'Pixel_um', 'PixelSize', 'pixelSize', 'Pixel')
+      );
+
+      const resolutionH = num(
+        pick(r, 'ResH_px', 'ResH', 'resolutionH')
+      );
+
+      const resolutionV = num(
+        pick(r, 'ResV_px', 'ResV', 'resolutionV')
+      );
+
+      const maxFps = pick(r, 'MaxFPS', 'MaxFps', 'maxFps')
+        ? num(pick(r, 'MaxFPS', 'MaxFps', 'maxFps'))
+        : undefined;
+
+      const explicitReadout = pick(
+        r,
+        'Readout_ms',
+        'Readout',
+        'readout'
+      );
+
+      return {
+
+        manufacturer: String(
+          pick(r, 'Manufacturer', 'manufacturer') ?? ''
+        ),
+
+        model: String(
+          pick(r, 'Model', 'model') ?? ''
+        ),
+
+        name: String(
+          pick(
+            r,
+            'Model',
+            'model',
+            'Nombre',
+            'Name',
+            'name'
+          ) ?? ''
+        ),
+
+        sensor: String(
+          pick(r, 'Sensor', 'sensor') ?? ''
+        ),
+
+        interface: String(
+          pick(r, 'Interface', 'interface') ?? ''
+        ),
+
+        shutter: String(
+          pick(r, 'Shutter', 'shutter') ?? ''
+        ),
+
+        color: String(
+          pick(r, 'Color', 'color') ?? ''
+        ),
+
+        sensorWidth:
+          resolutionH > 0 && pixelSize > 0
+            ? round((resolutionH * pixelSize) / 1000, 2)
+            : 0,
+
+        sensorHeight:
+          resolutionV > 0 && pixelSize > 0
+            ? round((resolutionV * pixelSize) / 1000, 2)
+            : 0,
+
+        pixelSize,
+
+        resolutionH,
+
+        resolutionV,
+
+        maxFps,
+
+        readout: explicitReadout
+          ? num(explicitReadout)
+          : maxFps
+          ? round(1000 / maxFps, 3)
+          : undefined,
+
+      };
+
+    });
+
+    const count = data.importCameras(cameras);
+
+    notify(
+      count
+        ? `✓ ${count} cámaras importadas`
+        : '⚠️ Ninguna fila válida'
+    );
+
+  } catch (e) {
+
+    console.error(e);
+
+    notify('⚠️ No se pudo leer el archivo');
+
+  }
+
+  if (cameraFileRef.current)
+    cameraFileRef.current.value = '';
+
+};
 
   const handleImportLenses = async (file: File | undefined) => {
     if (!file) return;
@@ -511,7 +596,17 @@ const handleExportLenses = () => {
             className="hidden"
             onChange={(e) => handleImportCameras(e.target.files?.[0])}
           />
-          <p className="text-xs text-slate-400">Columnas: Nombre, Pixel_um, ResH_px, ResV_px, MaxFPS (opcional). Ancho/Alto y Readout se calculan solos — no hace falta indicarlos (Readout_ms admite un valor manual si lo quieres sobrescribir)</p>
+          <p className="text-xs text-slate-400">Columnas:
+Manufacturer,
+Model,
+Sensor,
+Pixel_um,
+ResH_px,
+ResV_px,
+MaxFPS,
+Interface,
+Shutter,
+Color. Ancho/Alto y Readout se calculan solos — no hace falta indicarlos (Readout_ms admite un valor manual si lo quieres sobrescribir)</p>
         </div>
       </Card>
 
