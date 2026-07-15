@@ -134,6 +134,19 @@ const [lensDialog,setLensDialog]=useState(false);
   const highlightedFields = activeDepKey ? dependencyMap[activeDepKey] || [] : [];
   const isHighlighted = (key: string) => highlightedFields.includes(key);
 
+  // Al clicar en cualquier sitio que NO sea otro botón "de qué depende" (marcado con
+  // data-dep-toggle), se cierra el resaltado activo — así no hace falta recordar cuál se
+  // pinchó para quitarlo, cualquier otro clic en la pantalla lo limpia solo.
+  useEffect(() => {
+    if (!activeDepKey) return;
+    const handleOutsideClick = (e: MouseEvent) => {
+      if ((e.target as HTMLElement).closest('[data-dep-toggle]')) return;
+      setActiveDepKey(null);
+    };
+    document.addEventListener('click', handleOutsideClick);
+    return () => document.removeEventListener('click', handleOutsideClick);
+  }, [activeDepKey]);
+
   // FOV deseado X/Y enlazados por la relación de aspecto del sensor
   const handleDesiredFovXChange = (v: string | number) => {
     const x = typeof v === 'string' ? parseFloat(v) : v;
@@ -1029,7 +1042,7 @@ return (
                   tooltip="Cuántas líneas escaneadas componen una imagen completa del objeto (según su longitud en la dirección de avance y la resolución de escaneo)"
                 />
                 <div className={`col-span-2 text-xs text-slate-400 bg-slate-700 px-2 py-1.5 rounded ${isHighlighted('maxFps') ? 'ring-2 ring-amber-400' : ''}`}>
-                  <button type="button" onClick={() => handleLabelClick('maxFps')} className="hover:text-amber-300 underline decoration-dotted underline-offset-2">FPS equivalente</button>
+                  <button type="button" onClick={() => handleLabelClick('maxFps')} data-dep-toggle="true" className="hover:text-amber-300 underline decoration-dotted underline-offset-2">FPS equivalente</button>
                   {' = '}{lineRateHz > 0 ? lineRateHz : '—'} / {linesPerImage > 0 ? linesPerImage : '—'} = <span className="text-amber-400 font-bold">{store.maxFps > 0 ? store.maxFps.toFixed(2) : '—'} fps</span>
                 </div>
               </>
@@ -1135,6 +1148,7 @@ return (
               <button
                 type="button"
                 onClick={() => handleLabelClick('motionBlur')}
+                data-dep-toggle="true"
                 className="text-slate-300 hover:text-amber-300 underline decoration-dotted underline-offset-2 text-left"
                 title="Ver qué parámetros hacen falta para calcularlo"
               >
@@ -1218,21 +1232,21 @@ return (
             {store.results ? (
               <div className="grid grid-cols-2 gap-2 text-xs">
                 <div className={`${isFieldOfViewTarget ? 'bg-amber-900/50 border-amber-500 border-2' : 'bg-green-900/30 border border-green-700'} p-2 rounded ${isHighlighted('fovH') ? 'ring-2 ring-amber-400' : ''}`}>
-                  <button type="button" onClick={() => handleLabelClick('fovH')} className="text-green-300 text-xs hover:text-amber-300 underline decoration-dotted underline-offset-2">FOV H</button>
+                  <button type="button" onClick={() => handleLabelClick('fovH')} data-dep-toggle="true" className="text-green-300 text-xs hover:text-amber-300 underline decoration-dotted underline-offset-2">FOV H</button>
                   <p className="text-green-400 font-bold text-lg">{store.results.fovHorizontalMm?.toFixed(2)}</p>
                   <p className="text-green-300 text-xs">mm</p>
                 </div>
                 <div className={`bg-green-900/30 border border-green-700 p-2 rounded ${isHighlighted('fovV') ? 'ring-2 ring-amber-400' : ''}`}>
-                  <button type="button" onClick={() => handleLabelClick('fovV')} className="text-green-300 text-xs hover:text-amber-300 underline decoration-dotted underline-offset-2">FOV V</button>
+                  <button type="button" onClick={() => handleLabelClick('fovV')} data-dep-toggle="true" className="text-green-300 text-xs hover:text-amber-300 underline decoration-dotted underline-offset-2">FOV V</button>
                   <p className="text-green-400 font-bold text-lg">{store.results.fovVerticalMm?.toFixed(2)}</p>
                   <p className="text-green-300 text-xs">mm</p>
                 </div>
                 <div className={`bg-blue-900/30 border border-blue-700 p-2 rounded ${isHighlighted('magnification') ? 'ring-2 ring-amber-400' : ''}`}>
-                  <button type="button" onClick={() => handleLabelClick('magnification')} className="text-blue-300 text-xs hover:text-amber-300 underline decoration-dotted underline-offset-2">Magnification</button>
+                  <button type="button" onClick={() => handleLabelClick('magnification')} data-dep-toggle="true" className="text-blue-300 text-xs hover:text-amber-300 underline decoration-dotted underline-offset-2">Magnification</button>
                   <p className="text-blue-400 font-bold text-lg">×{store.results.magnification?.toFixed(4)}</p>
                 </div>
                 <div className={`bg-blue-900/30 border border-blue-700 p-2 rounded ${isHighlighted('maxFps') ? 'ring-2 ring-amber-400' : ''}`}>
-                  <button type="button" onClick={() => handleLabelClick('maxFps')} className="text-blue-300 text-xs hover:text-amber-300 underline decoration-dotted underline-offset-2">Max FPS</button>
+                  <button type="button" onClick={() => handleLabelClick('maxFps')} data-dep-toggle="true" className="text-blue-300 text-xs hover:text-amber-300 underline decoration-dotted underline-offset-2">Max FPS</button>
                   <p className="text-blue-400 font-bold text-lg">{store.maxFps?.toFixed(1)}</p>
                 </div>
                 <div className="bg-purple-900/30 border border-purple-700 p-2 rounded">
@@ -1243,7 +1257,7 @@ return (
                     <p className="text-purple-300 text-xs">mm/px</p>
                   </div>
                 <div className={`bg-orange-900/30 border border-orange-700 p-2 rounded ${isHighlighted('motionBlur') ? 'ring-2 ring-amber-400' : ''}`}>
-                  <button type="button" onClick={() => handleLabelClick('motionBlur')} className="text-orange-300 text-xs hover:text-amber-300 underline decoration-dotted underline-offset-2">Motion Blur</button>
+                  <button type="button" onClick={() => handleLabelClick('motionBlur')} data-dep-toggle="true" className="text-orange-300 text-xs hover:text-amber-300 underline decoration-dotted underline-offset-2">Motion Blur</button>
                   <p className="text-orange-400 font-bold text-lg">{motionBlur.blurPixels?.toFixed(2)}</p>
                   <p className="text-orange-300 text-xs">px · {motionBlur.qualityIndicator ? MOTION_BLUR_QUALITY_LABELS[motionBlur.qualityIndicator] : ''}</p>
                 </div>
@@ -1260,17 +1274,17 @@ return (
             {dofResults ? (
               <div className={`grid grid-cols-3 gap-2 text-xs ${isHighlighted('dof') ? 'ring-2 ring-amber-400 rounded p-1' : ''}`}>
                 <div className="bg-blue-900/30 border border-blue-700 p-2 rounded text-center">
-                  <button type="button" onClick={() => handleLabelClick('dof')} className="text-blue-300 hover:text-amber-300 underline decoration-dotted underline-offset-2">Límite Cercano</button>
+                  <button type="button" onClick={() => handleLabelClick('dof')} data-dep-toggle="true" className="text-blue-300 hover:text-amber-300 underline decoration-dotted underline-offset-2">Límite Cercano</button>
                   <p className="text-blue-400 font-bold">{dofResults.nearLimit?.toFixed(1)}</p>
                   <p className="text-blue-300">mm</p>
                 </div>
                 <div className="bg-blue-900/30 border border-blue-700 p-2 rounded text-center">
-                  <button type="button" onClick={() => handleLabelClick('dof')} className="text-blue-300 hover:text-amber-300 underline decoration-dotted underline-offset-2">Límite Lejano</button>
+                  <button type="button" onClick={() => handleLabelClick('dof')} data-dep-toggle="true" className="text-blue-300 hover:text-amber-300 underline decoration-dotted underline-offset-2">Límite Lejano</button>
                   <p className="text-blue-400 font-bold">{dofResults.farLimit === Infinity ? '∞' : dofResults.farLimit?.toFixed(1)}</p>
                   <p className="text-blue-300">mm</p>
                 </div>
                 <div className="bg-green-900/30 border border-green-700 p-2 rounded text-center">
-                  <button type="button" onClick={() => handleLabelClick('dof')} className="text-green-300 hover:text-amber-300 underline decoration-dotted underline-offset-2">DOF Total</button>
+                  <button type="button" onClick={() => handleLabelClick('dof')} data-dep-toggle="true" className="text-green-300 hover:text-amber-300 underline decoration-dotted underline-offset-2">DOF Total</button>
                   <p className="text-green-400 font-bold">{dofResults.totalDepthOfField === Infinity ? '∞' : dofResults.totalDepthOfField?.toFixed(2)}</p>
                   <p className="text-green-300">mm</p>
                 </div>

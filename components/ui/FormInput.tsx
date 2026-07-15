@@ -83,6 +83,7 @@ export function FormInput({
           <button
             type="button"
             onClick={onLabelClick}
+            data-dep-toggle="true"
             className="text-xs font-semibold text-slate-300 hover:text-amber-300 underline decoration-dotted underline-offset-2 transition text-left"
             title="Ver de qué depende este valor"
           >
