@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import { useDataStore } from '@/lib/dataStore';
 import { COMMON_CAMERAS, COMMON_LENSES } from '@/lib/commonCatalog';
+import { round } from '@/lib/calculationEngine';
 
 interface RequestDialogProps {
   onClose: () => void;
@@ -18,10 +19,11 @@ export function RequestDialog({ onClose, initialType = 'camera' }: RequestDialog
   const [requestedBy, setRequestedBy] = useState('');
   const [sent, setSent] = useState(false);
 
-  // Cámara
+  // Cámara — el Ancho/Alto del sensor NUNCA se piden a mano: se derivan de Píxel + Res H/V,
+  // igual que en la Calculadora y en la plantilla de importación Excel (Nombre, Pixel_um,
+  // ResH_px, ResV_px, MaxFPS). Pedirlos como campos manuales aparte permitía que quedaran
+  // desincronizados del resto de datos.
   const [camName, setCamName] = useState('');
-  const [sensorWidth, setSensorWidth] = useState('');
-  const [sensorHeight, setSensorHeight] = useState('');
   const [pixelSize, setPixelSize] = useState('');
   const [resolutionH, setResolutionH] = useState('');
   const [resolutionV, setResolutionV] = useState('');
@@ -34,6 +36,9 @@ export function RequestDialog({ onClose, initialType = 'camera' }: RequestDialog
   const [aperture, setAperture] = useState('');
 
   const num = (v: string) => parseFloat(v.replace(',', '.')) || 0;
+
+  const sensorWidthMm = num(resolutionH) > 0 && num(pixelSize) > 0 ? (num(resolutionH) * num(pixelSize)) / 1000 : 0;
+  const sensorHeightMm = num(resolutionV) > 0 && num(pixelSize) > 0 ? (num(resolutionV) * num(pixelSize)) / 1000 : 0;
 
   // Sugerencias para el datalist: catálogo actual + catálogo común (aunque no esté importado aún)
   const cameraSuggestions = useMemo(
@@ -64,7 +69,7 @@ export function RequestDialog({ onClose, initialType = 'camera' }: RequestDialog
   const camNameClash = nameClash(camName);
   const lensNameClash = nameClash(lensName);
 
-  const cameraValid = camName.trim() && !camNameClash && num(sensorWidth) > 0 && num(sensorHeight) > 0 && num(pixelSize) > 0;
+  const cameraValid = camName.trim() && !camNameClash && num(pixelSize) > 0 && num(resolutionH) > 0 && num(resolutionV) > 0;
   const lensValid = lensName.trim() && !lensNameClash && num(focalLength) > 0;
   const valid = requestedBy.trim() && (type === 'camera' ? cameraValid : lensValid);
 
@@ -77,13 +82,13 @@ export function RequestDialog({ onClose, initialType = 'camera' }: RequestDialog
         type === 'camera'
           ? {
               name: camName.trim(),
-              sensorWidth: num(sensorWidth),
-              sensorHeight: num(sensorHeight),
+              sensorWidth: round(sensorWidthMm, 2),
+              sensorHeight: round(sensorHeightMm, 2),
               pixelSize: num(pixelSize),
               resolutionH: Math.round(num(resolutionH)),
               resolutionV: Math.round(num(resolutionV)),
               maxFps: maxFps.trim() ? num(maxFps) : undefined,
-              readout: readout.trim() ? num(readout) : undefined,
+              readout: readout.trim() ? num(readout) : (maxFps.trim() ? round(1000 / num(maxFps), 3) : undefined),
             }
           : {
               name: lensName.trim(),
@@ -160,19 +165,11 @@ export function RequestDialog({ onClose, initialType = 'camera' }: RequestDialog
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <label className="text-xs text-slate-300">Ancho sensor (mm) *</label>
-                    <input type="number" step="0.1" value={sensorWidth} onChange={(e) => setSensorWidth(e.target.value)} className={inputClass} />
-                  </div>
-                  <div>
-                    <label className="text-xs text-slate-300">Alto sensor (mm) *</label>
-                    <input type="number" step="0.1" value={sensorHeight} onChange={(e) => setSensorHeight(e.target.value)} className={inputClass} />
-                  </div>
-                  <div>
                     <label className="text-xs text-slate-300">Píxel (µm) *</label>
                     <input type="number" step="0.01" value={pixelSize} onChange={(e) => setPixelSize(e.target.value)} className={inputClass} />
                   </div>
                   <div>
-                    <label className="text-xs text-slate-300">Resolución H × V (px)</label>
+                    <label className="text-xs text-slate-300">Resolución H × V (px) *</label>
                     <div className="flex gap-1">
                       <input type="number" value={resolutionH} onChange={(e) => setResolutionH(e.target.value)} placeholder="H" className={inputClass} />
                       <input type="number" value={resolutionV} onChange={(e) => setResolutionV(e.target.value)} placeholder="V" className={inputClass} />
@@ -184,9 +181,14 @@ export function RequestDialog({ onClose, initialType = 'camera' }: RequestDialog
                   </div>
                   <div>
                     <label className="text-xs text-slate-300">Readout (ms, opcional)</label>
-                    <input type="number" step="0.1" value={readout} onChange={(e) => setReadout(e.target.value)} placeholder="Ej: 10" className={inputClass} />
+                    <input type="number" step="0.1" value={readout} onChange={(e) => setReadout(e.target.value)} placeholder={maxFps.trim() ? `Auto: ${round(1000 / num(maxFps), 3)}` : 'Ej: 10'} className={inputClass} />
                   </div>
                 </div>
+                {sensorWidthMm > 0 && sensorHeightMm > 0 && (
+                  <p className="text-xs text-slate-400">
+                    Sensor calculado: {sensorWidthMm.toFixed(2)} × {sensorHeightMm.toFixed(2)} mm (= Res × Píxel, igual que en la Calculadora)
+                  </p>
+                )}
               </>
             ) : (
               <>
