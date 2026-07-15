@@ -19,6 +19,7 @@ import {
   INSPECTION_TYPE_LABELS,
   InspectionType,
 } from '@/lib/calculationEngine';
+import { Camera, Lens } from '@/lib/types';
 
 
 
@@ -59,6 +60,20 @@ function detectSensorFormat(widthMm: number, heightMm: number): string {
 }
 
 const CUSTOM_FORMAT_VALUE = '__custom__';
+
+// Fabricante+modelo es más específico que el nombre corto del catálogo (p.ej. "Cognex
+// Insight 3801" en vez de solo "Cognex Insight") — se usa donde sea que se muestre la
+// cámara/lente elegida: botón del selector, historial de diagnóstico e informe PDF.
+function cameraDisplayLabel(camera: Camera | null): string {
+  if (!camera) return 'Personalizada';
+  if (camera.manufacturer && camera.model) return `${camera.manufacturer} ${camera.model}`;
+  return camera.display_name;
+}
+function lensDisplayLabel(lens: Lens | null): string {
+  if (!lens) return 'Personalizado';
+  if (lens.manufacturer && lens.model) return `${lens.manufacturer} ${lens.model}`;
+  return lens.display_name;
+}
 
 
 export function CalculatorTab() {
@@ -188,7 +203,32 @@ const [lensDialog,setLensDialog]=useState(false);
     if (cam.maxFps) store.setMaxFps(cam.maxFps);
     if (cam.readout !== undefined) store.setReadout(cam.readout);
     else if (cam.maxFps) store.setReadout(round(1000 / cam.maxFps, 3));
-    store.setCamera({ display_name: cam.name } as any);
+    // Se guarda el detalle completo del catálogo (no solo el nombre) para que el informe
+    // PDF y cualquier otro consumidor puedan mostrar manufacturer/model/sensor/etc. — antes
+    // solo se guardaba display_name y el resto de datos se perdían silenciosamente.
+    store.setCamera({
+      id: cam.id,
+      display_name: cam.name,
+      sensor_name: cam.sensor || '',
+      pixel_size_um: cam.pixelSize,
+      resolution_h: cam.resolutionH,
+      resolution_v: cam.resolutionV,
+      interface: cam.interface || '',
+      created_at: '',
+      manufacturer: cam.manufacturer,
+      model: cam.model,
+      sensorModel: cam.sensor,
+      cameraInterface: cam.interface,
+      shutter: cam.shutter,
+      color: cam.color,
+      sensorWidthMm: cam.sensorWidth,
+      sensorHeightMm: cam.sensorHeight,
+      pixelSizeUm: cam.pixelSize,
+      resolutionH: cam.resolutionH,
+      resolutionV: cam.resolutionV,
+      maxFps: cam.maxFps,
+      readoutMs: cam.readout,
+    });
   };
 
   // Ya no hace falta al editar (esos campos quedan disabled mientras haya cámara elegida),
@@ -209,7 +249,23 @@ const [lensDialog,setLensDialog]=useState(false);
       return;
     }
     store.setFocalLength(lens.focalLength);
-    store.setLens({ display_name: lens.name } as any);
+    store.setLens({
+      id: lens.id,
+      display_name: lens.name,
+      focal_length_mm: lens.focalLength,
+      min_aperture: 0,
+      max_aperture: 0,
+      minimum_focus_distance_mm: 0,
+      max_sensor_format: lens.maxSensor || '',
+      created_at: '',
+      manufacturer: lens.manufacturer,
+      model: lens.model,
+      aperture: lens.aperture,
+      mount: lens.mount,
+      telecentric: lens.telecentric,
+      workingDistanceMinMm: lens.workingDistanceMin,
+      workingDistanceMaxMm: lens.workingDistanceMax,
+    });
   };
 
   // Ancho/Alto SIEMPRE se recalculan juntos a partir del mismo trío (Píxel, ResH, ResV) —
@@ -530,8 +586,8 @@ const exposure =
       created_at: new Date().toISOString(),
       tab: 'Calculadora',
       target_calculation: isFieldOfViewTarget ? 'Field of View' : isWorkingDistanceTarget ? 'Working Distance' : 'Focal Length',
-      camera_model: store.camera?.display_name,
-      lens_model: store.lens?.display_name,
+      camera_model: cameraDisplayLabel(store.camera),
+      lens_model: lensDisplayLabel(store.lens),
       sensor_format: sensorFormat,
       sensor_width_mm: store.sensorWidth,
       sensor_height_mm: store.sensorHeight,
@@ -572,12 +628,21 @@ const exposure =
 
   const handleExportPdf = () => {
     if (!store.results) return;
+    const cameraLabel = cameraDisplayLabel(store.camera);
+    const lensLabel = lensDisplayLabel(store.lens);
     openPrintableReport('Informe de Cálculo Óptico', [
       {
         title: 'Equipo',
         rows: [
-          { label: 'Cámara', value: store.camera?.display_name || 'Personalizada' },
-          { label: 'Lente', value: store.lens?.display_name || 'Personalizada' },
+          { label: 'Cámara', value: cameraLabel },
+          ...(store.camera?.sensorModel ? [{ label: 'Sensor', value: store.camera.sensorModel }] : []),
+          ...(store.camera?.cameraInterface ? [{ label: 'Interfaz', value: store.camera.cameraInterface }] : []),
+          ...(store.camera?.shutter ? [{ label: 'Obturador', value: store.camera.shutter }] : []),
+          ...(store.camera?.color ? [{ label: 'Color/Mono', value: store.camera.color }] : []),
+          { label: 'Lente', value: lensLabel },
+          ...(store.lens?.aperture ? [{ label: 'Apertura lente', value: store.lens.aperture }] : []),
+          ...(store.lens?.mount ? [{ label: 'Montura', value: store.lens.mount }] : []),
+          ...(store.lens?.telecentric ? [{ label: 'Telecéntrica', value: store.lens.telecentric }] : []),
         ],
       },
       {
@@ -716,9 +781,7 @@ return (
                   onClick={()=>setCameraDialog(true)}
                   className="flex-1 bg-slate-700 hover:bg-slate-600 rounded px-3 py-2 text-left"
               >
-                  {store.camera?.display_name
-                      ? `📷 ${store.camera.display_name}`
-                      : 'Seleccionar cámara'}
+                  {store.camera ? `📷 ${cameraDisplayLabel(store.camera)}` : 'Seleccionar cámara'}
               </button>
             <button
               onClick={() => setRequestDialogType('camera')}
@@ -921,9 +984,7 @@ return (
               onClick={() => setLensDialog(true)}
               className="flex-1 bg-slate-700 hover:bg-slate-600 rounded px-3 py-2 text-left"
           >
-              {store.lens?.display_name
-                  ? `🔭 ${store.lens.display_name}`
-                  : 'Seleccionar lente'}
+              {store.lens ? `🔭 ${lensDisplayLabel(store.lens)}` : 'Seleccionar lente'}
           </button>
           <button
             onClick={() => setRequestDialogType('lens')}

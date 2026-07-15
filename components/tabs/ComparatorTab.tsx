@@ -46,9 +46,18 @@ export function ComparatorTab() {
     results: saved.results || {},
   });
 
+  // Fabricante+modelo es más específico que el nombre corto del catálogo (p.ej. "Cognex
+  // Insight 3801" en vez de solo "Cognex Insight"), igual que en CalculatorTab.
+  const camLabel = store.camera?.manufacturer && store.camera?.model
+    ? `${store.camera.manufacturer} ${store.camera.model}`
+    : store.camera?.display_name;
+  const lensLabel = store.lens?.manufacturer && store.lens?.model
+    ? `${store.lens.manufacturer} ${store.lens.model}`
+    : store.lens?.display_name;
+
   const configFromCurrent = (): ComparedConfig => ({
-    camera: store.camera?.display_name || 'Custom',
-    lens: store.lens?.display_name || 'Custom',
+    camera: camLabel || 'Custom',
+    lens: lensLabel || 'Custom',
     focalLength: store.focalLength,
     workingDistance: store.workingDistance,
     maxFps: store.maxFps,

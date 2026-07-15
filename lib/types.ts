@@ -20,6 +20,23 @@ export interface Camera {
   interface: string;
   source_url?: string;
   created_at: string;
+  // Datos completos del catálogo (StoredCamera) para poder mostrarlos íntegros
+  // en el informe PDF y en cualquier otro sitio que necesite el detalle completo,
+  // no solo el nombre. Todos opcionales porque una cámara "Personalizada" (sin
+  // catálogo) no los tiene.
+  manufacturer?: string;
+  model?: string;
+  sensorModel?: string;
+  cameraInterface?: string;
+  shutter?: string;
+  color?: string;
+  sensorWidthMm?: number;
+  sensorHeightMm?: number;
+  pixelSizeUm?: number;
+  resolutionH?: number;
+  resolutionV?: number;
+  maxFps?: number;
+  readoutMs?: number;
 }
 
 // Lens
@@ -33,6 +50,14 @@ export interface Lens {
   max_sensor_format: string;
   source_url?: string;
   created_at: string;
+  // Datos completos del catálogo (StoredLens), mismo motivo que en Camera arriba.
+  manufacturer?: string;
+  model?: string;
+  aperture?: string;
+  mount?: string;
+  telecentric?: string;
+  workingDistanceMinMm?: number;
+  workingDistanceMaxMm?: number;
 }
 
 // Sensor Format
