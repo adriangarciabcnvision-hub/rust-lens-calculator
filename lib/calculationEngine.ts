@@ -6,7 +6,8 @@ import {
   DepthOfFieldRequest,
   DepthOfFieldResult,
   CodeReadabilityRequest,
-  CodeReadabilityResult
+  CodeReadabilityResult,
+  CodeType
 } from './types';
 
 const SENSOR_FORMATS: Record<string, [number, number]> = {
@@ -365,14 +366,24 @@ export function calculateDepthOfField(
 /**
  * CODE READABILITY - Legibilidad de códigos (Barcode/QR)
  *
- * Estándar AIM/ISO:
- *   PixelsPerModule = TamañoMódulo_mm / mm_per_pixel
+ * PixelsPerModule = TamañoMódulo_mm / mm_per_pixel
  *
- * Veredicto:
- *   - Readable:     PixelsPerModule ≥ Threshold × 2
- *   - Marginal:     PixelsPerModule ≥ Threshold
- *   - Not Readable: PixelsPerModule < Threshold
+ * Los criterios de lectura NO son iguales para 1D que para 2D:
+ *   - 1D (códigos de barras lineales, ISO/IEC 15416): con 2 px/módulo ya se
+ *     distinguen barra/espacio de forma fiable; 3+ px/módulo es la franja
+ *     recomendada para lectura robusta.
+ *   - 2D (Data Matrix / QR, ISO/IEC 15415 y guía AIM DPM): al decodificar en
+ *     dos ejes a la vez el margen de error es menor, por eso el mínimo
+ *     aceptable sube a 3 px/módulo y lo recomendado a 5 px/módulo.
  */
+export const CODE_TYPE_THRESHOLDS: Record<
+  CodeType,
+  { marginal: number; readable: number; standard: string }
+> = {
+  '1D': { marginal: 2, readable: 3, standard: 'ISO/IEC 15416' },
+  '2D': { marginal: 3, readable: 5, standard: 'ISO/IEC 15415 / AIM DPM' },
+};
+
 export function calculateCodeReadability(
   req: CodeReadabilityRequest
 ): CodeReadabilityResult {
@@ -380,6 +391,7 @@ export function calculateCodeReadability(
     const {
       mmPerPixel,
       moduleSizeMm,
+      codeType,
     } = req;
 
     if (
@@ -396,15 +408,17 @@ export function calculateCodeReadability(
     const pixelsPerModule =
       moduleSizeMm / mmPerPixel;
 
+    const { marginal, readable } = CODE_TYPE_THRESHOLDS[codeType];
+
     let verdict:
       | "readable"
       | "marginal"
       | "not_readable";
 
-    if (pixelsPerModule >= 4) {
+    if (pixelsPerModule >= readable) {
       verdict = "readable";
     }
-    else if (pixelsPerModule >= 2) {
+    else if (pixelsPerModule >= marginal) {
       verdict = "marginal";
     }
     else {
@@ -418,6 +432,8 @@ export function calculateCodeReadability(
         2
       ),
       verdict,
+      marginalThreshold: marginal,
+      readableThreshold: readable,
     };
 
   } catch (error) {

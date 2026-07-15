@@ -119,9 +119,15 @@ const [lensDialog,setLensDialog]=useState(false);
         ? ['workingDistance', 'desiredFovX', 'sensorWidth']
         : ['focalLength', 'workingDistance'],
     maxFps: ['maxFps'],
-    // El blur se mide en mm/pixel SOBRE EL OBJETO (incorpora la magnificación), no en el
-    // píxel físico del sensor — depende de todo el triángulo óptico, no solo del píxel
-    motionBlur: ['velocity', 'exposure', 'sensorWidth', 'focalLength', 'workingDistance', 'resolutionH'],
+    // Motion Blur = Velocidad convertida a px/s (usando el Píxel) × Exposición. Depende
+    // solo de estos 3 inputs directos — no de focal/WD/sensorWidth por separado.
+    motionBlur: ['velocity', 'exposure', 'pixelSize'],
+    // Motion Blur y Frame Rate: 4 campos ligados por el selector "¿Qué calcular?". El campo
+    // objetivo de cada modo se resalta con sus inputs reales; los otros 3 son edición libre.
+    fps: ['exposure', 'readout', 'maxFps'],
+    exposure: ['fps', 'readout', 'velocity', 'pixelSize'],
+    velocity: ['fps', 'fotosPerMm'],
+    fotosPerMm: motionTarget === 'fps' ? ['exposure', 'readout', 'maxFps', 'velocity'] : ['fps', 'velocity'],
     dof: ['focalLength', 'workingDistance', 'fNumber', 'circleOfConfusion', 'minimumFocusDistance'],
   };
   const handleLabelClick = (key: string) => setActiveDepKey((prev) => (prev === key ? null : key));
@@ -400,13 +406,15 @@ const blurLimit =
         ? Number.MAX_VALUE
         : INSPECTION_BLUR_THRESHOLDS[inspectionType];
 
+// OJO: usa la `velocity` recién calculada arriba, no store.velocity (que en este modo
+// todavía tiene el valor del render anterior hasta que el useEffect de sync lo actualice)
 const exposureByBlur =
-    store.velocity > 0 &&
+    velocity > 0 &&
     (store.results?.spatialResolution ?? 0) > 0
         ? (blurLimit *
             (store.results?.spatialResolution ?? 0) *
             1000) /
-          store.velocity
+          velocity
         : Number.MAX_VALUE;
 
 const exposure =
@@ -1037,6 +1045,7 @@ return (
                 min={0}
                 disabled={isCameraLocked}
                 tooltip={isCameraLocked ? '❌ Viene de la cámara seleccionada — elige "Sin cámara" para editarlo' : 'Tiempo de lectura del sensor. Se rellena solo al elegir cámara del catálogo, o se estima como 1000/MaxFPS — sobrescríbelo si tienes un dato más preciso del datasheet'}
+                highlighted={isHighlighted('readout')}
               />
             </div>
           </div>
@@ -1066,6 +1075,8 @@ return (
               step="1"
               min={0.1}
               tooltip={fpsFieldDisabled ? '❌ Se calcula automáticamente' : 'A qué FPS quieres operar (frente al máximo de la cámara)'}
+              onLabelClick={fpsFieldDisabled ? () => handleLabelClick('fps') : undefined}
+              highlighted={isHighlighted('fps')}
             />
             <FormInput
               label="Exposición"
@@ -1077,6 +1088,7 @@ return (
               step="0.1"
               min={0.01}
               tooltip={exposureFieldDisabled ? '❌ Se calcula automáticamente' : 'Tiempo de exposición'}
+              onLabelClick={exposureFieldDisabled ? () => handleLabelClick('exposure') : undefined}
               highlighted={isHighlighted('exposure')}
             />
             <FormInput
@@ -1089,6 +1101,7 @@ return (
               step="10"
               min={0}
               tooltip={velocityFieldDisabled ? '❌ Se calcula automáticamente' : 'Velocidad del objeto'}
+              onLabelClick={velocityFieldDisabled ? () => handleLabelClick('velocity') : undefined}
               highlighted={isHighlighted('velocity')}
             />
             <FormInput
@@ -1100,6 +1113,8 @@ return (
               step="0.1"
               min={0.01}
               tooltip={fotosPerMmFieldDisabled ? '❌ Se calcula automáticamente' : 'Imágenes capturadas por milímetro de desplazamiento (densidad de muestreo)'}
+              onLabelClick={fotosPerMmFieldDisabled ? () => handleLabelClick('fotosPerMm') : undefined}
+              highlighted={isHighlighted('fotosPerMm')}
             />
           </div>
 

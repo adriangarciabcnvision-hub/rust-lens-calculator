@@ -147,10 +147,12 @@ export interface DepthOfFieldRequest {
   minimumFocusDistanceMm?: number;
 }
 
+export type CodeType = '1D' | '2D';
+
 export interface CodeReadabilityRequest {
   mmPerPixel: number;
   moduleSizeMm: number;
-  thresholdPixelsPerModule: number;
+  codeType: CodeType;
 }
 
 // Calculation Results
@@ -193,6 +195,8 @@ export interface CodeReadabilityResult {
   success: boolean;
   pixelsPerModule?: number;
   verdict?: 'readable' | 'marginal' | 'not_readable';
+  marginalThreshold?: number;
+  readableThreshold?: number;
   error?: string;
 }
 
