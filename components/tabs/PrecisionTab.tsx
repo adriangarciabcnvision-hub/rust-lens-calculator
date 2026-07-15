@@ -9,16 +9,58 @@ import { useCalculatorStore } from '@/lib/store';
 
 
 
+type PrecisionField = "fov" | "resolution" | "spatial";
+
 export function PrecisionTab() {
 
     const store = useCalculatorStore();
 
-    
+
     const [useCalculatorValues, setUseCalculatorValues] = useState(true);
 
 const [manualFov, setManualFov] = useState(0);
 
 const [manualResolution, setManualResolution] = useState(0);
+
+const [manualSpatial, setManualSpatial] = useState(0);
+
+// FOV, Resolución cámara y Resolución del sistema están ligados por spatial = fov/resolution.
+// Solo hay 2 grados de libertad: se recuerda el orden de edición (más reciente primero) y,
+// al editar un campo, se recalcula el que lleve MÁS TIEMPO sin tocarse — el otro campo
+// (el editado justo antes de este) se deja tal cual, igual que pidió el cliente.
+const [editPriority, setEditPriority] = useState<PrecisionField[]>([
+    "resolution",
+    "fov",
+    "spatial",
+]);
+
+const handleManualEdit = (
+    field: PrecisionField,
+    value: number
+) => {
+    const newPriority: PrecisionField[] = [
+        field,
+        ...editPriority.filter((f) => f !== field),
+    ];
+    const computedField = newPriority[2];
+
+    let fovV = field === "fov" ? value : manualFov;
+    let resV = field === "resolution" ? value : manualResolution;
+    let spV = field === "spatial" ? value : manualSpatial;
+
+    if (computedField === "spatial") {
+        spV = resV > 0 ? fovV / resV : 0;
+    } else if (computedField === "fov") {
+        fovV = resV * spV;
+    } else if (computedField === "resolution") {
+        resV = spV > 0 ? fovV / spV : 0;
+    }
+
+    setEditPriority(newPriority);
+    setManualFov(fovV);
+    setManualResolution(resV);
+    setManualSpatial(spV);
+};
 
 const fov = useCalculatorValues
     ? (store.results?.fovHorizontalMm ?? 0)
@@ -28,10 +70,9 @@ const resolution = useCalculatorValues
     ? (store.resolution_h ?? 0)
     : manualResolution;
 
-const spatialResolution =
-    resolution > 0
-        ? fov / resolution
-        : 0;
+const spatialResolution = useCalculatorValues
+    ? (resolution > 0 ? fov / resolution : 0)
+    : manualSpatial;
 
     const [blobSize, setBlobSize] =
         useState(1);
@@ -141,7 +182,8 @@ const spatialResolution =
             type="number"
             value={fov}
             onChange={(v) =>
-                setManualFov(
+                handleManualEdit(
+                    "fov",
                     typeof v === "string"
                         ? parseFloat(v)
                         : v
@@ -156,7 +198,8 @@ const spatialResolution =
             type="number"
             value={resolution}
             onChange={(v) =>
-                setManualResolution(
+                handleManualEdit(
+                    "resolution",
                     typeof v === "string"
                         ? parseFloat(v)
                         : v
@@ -166,29 +209,30 @@ const spatialResolution =
             unit="px"
         />
 
-        <div className="bg-slate-800 rounded p-3 text-center">
-
-            <div className="text-xs text-slate-400">
-
-                Resolución del sistema
-
-            </div>
-
-            <div className="text-2xl font-bold text-amber-400">
-
-                {spatialResolution.toFixed(4)}
-
-            </div>
-
-            <div className="text-xs text-slate-400">
-
-                mm/px
-
-            </div>
-
-        </div>
+        <FormInput
+            label="Resolución del sistema"
+            type="number"
+            value={spatialResolution}
+            onChange={(v) =>
+                handleManualEdit(
+                    "spatial",
+                    typeof v === "string"
+                        ? parseFloat(v)
+                        : v
+                )
+            }
+            disabled={useCalculatorValues}
+            step="0.0001"
+            unit="mm/px"
+        />
 
     </div>
+
+    {!useCalculatorValues && (
+        <p className="text-xs text-slate-500 mt-2">
+            Los 3 campos están ligados (Resolución del sistema = Campo de visión / Resolución cámara): al editar uno, se recalcula el que lleve más tiempo sin tocar.
+        </p>
+    )}
 
 </Card>
                         <Card
