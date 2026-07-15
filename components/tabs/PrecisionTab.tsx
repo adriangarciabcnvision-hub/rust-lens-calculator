@@ -24,55 +24,50 @@ const [manualResolution, setManualResolution] = useState(0);
 
 const [manualSpatial, setManualSpatial] = useState(0);
 
-// FOV, Resolución cámara y Resolución del sistema están ligados por spatial = fov/resolution.
-// Solo hay 2 grados de libertad: se recuerda el orden de edición (más reciente primero) y,
-// al editar un campo, se recalcula el que lleve MÁS TIEMPO sin tocarse — el otro campo
-// (el editado justo antes de este) se deja tal cual, igual que pidió el cliente.
-const [editPriority, setEditPriority] = useState<PrecisionField[]>([
-    "resolution",
-    "fov",
-    "spatial",
-]);
-
-const handleManualEdit = (
-    field: PrecisionField,
-    value: number
-) => {
-    const newPriority: PrecisionField[] = [
-        field,
-        ...editPriority.filter((f) => f !== field),
-    ];
-    const computedField = newPriority[2];
-
-    let fovV = field === "fov" ? value : manualFov;
-    let resV = field === "resolution" ? value : manualResolution;
-    let spV = field === "spatial" ? value : manualSpatial;
-
-    if (computedField === "spatial") {
-        spV = resV > 0 ? fovV / resV : 0;
-    } else if (computedField === "fov") {
-        fovV = resV * spV;
-    } else if (computedField === "resolution") {
-        resV = spV > 0 ? fovV / spV : 0;
-    }
-
-    setEditPriority(newPriority);
-    setManualFov(fovV);
-    setManualResolution(resV);
-    setManualSpatial(spV);
-};
+// FOV, Resolución cámara y Resolución del sistema están ligados por spatial = fov/resolution
+// (solo hay 2 grados de libertad). En vez de adivinar cuál autocalcular por orden de edición
+// (eso hacía que borrar un campo arrastrara a los otros dos a 0), el usuario elige explícitamente
+// con el botón "auto" de cada campo cuál de los 3 se deriva de los otros dos.
+const [autoField, setAutoField] = useState<PrecisionField>("spatial");
 
 const fov = useCalculatorValues
     ? (store.results?.fovHorizontalMm ?? 0)
-    : manualFov;
+    : autoField === "fov"
+        ? manualResolution * manualSpatial
+        : manualFov;
 
 const resolution = useCalculatorValues
     ? (store.resolution_h ?? 0)
-    : manualResolution;
+    : autoField === "resolution"
+        ? (manualSpatial > 0 ? manualFov / manualSpatial : 0)
+        : manualResolution;
 
 const spatialResolution = useCalculatorValues
     ? (resolution > 0 ? fov / resolution : 0)
-    : manualSpatial;
+    : autoField === "spatial"
+        ? (manualResolution > 0 ? manualFov / manualResolution : 0)
+        : manualSpatial;
+
+const autoFieldLabels: Record<PrecisionField, string> = {
+    fov: "Campo de visión",
+    resolution: "Resolución cámara",
+    spatial: "Resolución del sistema",
+};
+
+const AutoToggle = ({ field }: { field: PrecisionField }) => (
+    <button
+        type="button"
+        onClick={() => setAutoField(field)}
+        title={`Autocalcular ${autoFieldLabels[field]} a partir de los otros dos`}
+        className={`text-[10px] font-bold px-1.5 py-0.5 rounded border transition ${
+            autoField === field
+                ? "bg-amber-500 border-amber-400 text-white"
+                : "bg-slate-700 border-slate-600 text-slate-400 hover:bg-slate-600"
+        }`}
+    >
+        auto
+    </button>
+);
 
     const [blobSize, setBlobSize] =
         useState(1);
@@ -182,14 +177,14 @@ const spatialResolution = useCalculatorValues
             type="number"
             value={fov}
             onChange={(v) =>
-                handleManualEdit(
-                    "fov",
+                setManualFov(
                     typeof v === "string"
                         ? parseFloat(v)
                         : v
                 )
             }
-            disabled={useCalculatorValues}
+            disabled={useCalculatorValues || autoField === "fov"}
+            icon={!useCalculatorValues ? <AutoToggle field="fov" /> : undefined}
             unit="mm"
         />
 
@@ -198,14 +193,14 @@ const spatialResolution = useCalculatorValues
             type="number"
             value={resolution}
             onChange={(v) =>
-                handleManualEdit(
-                    "resolution",
+                setManualResolution(
                     typeof v === "string"
                         ? parseFloat(v)
                         : v
                 )
             }
-            disabled={useCalculatorValues}
+            disabled={useCalculatorValues || autoField === "resolution"}
+            icon={!useCalculatorValues ? <AutoToggle field="resolution" /> : undefined}
             unit="px"
         />
 
@@ -214,14 +209,14 @@ const spatialResolution = useCalculatorValues
             type="number"
             value={spatialResolution}
             onChange={(v) =>
-                handleManualEdit(
-                    "spatial",
+                setManualSpatial(
                     typeof v === "string"
                         ? parseFloat(v)
                         : v
                 )
             }
-            disabled={useCalculatorValues}
+            disabled={useCalculatorValues || autoField === "spatial"}
+            icon={!useCalculatorValues ? <AutoToggle field="spatial" /> : undefined}
             step="0.0001"
             unit="mm/px"
         />
@@ -230,7 +225,7 @@ const spatialResolution = useCalculatorValues
 
     {!useCalculatorValues && (
         <p className="text-xs text-slate-500 mt-2">
-            Los 3 campos están ligados (Resolución del sistema = Campo de visión / Resolución cámara): al editar uno, se recalcula el que lleve más tiempo sin tocar.
+            Los 3 campos están ligados (Resolución del sistema = Campo de visión / Resolución cámara). Marca "auto" en el que quieras que se calcule solo; los otros dos se editan libremente.
         </p>
     )}
 
