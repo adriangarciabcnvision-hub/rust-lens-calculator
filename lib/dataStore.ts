@@ -131,6 +131,8 @@ interface DataState {
   savedSets: SavedSet[];
   requests: CatalogRequest[];
   cloudActive: boolean;
+  // Mensaje del último fallo al conectar con Supabase (null si todo bien o sin configurar)
+  cloudError: string | null;
 
   syncFromCloud: () => Promise<void>;
 
@@ -169,6 +171,7 @@ export const useDataStore = create<DataState>()(
       savedSets: [],
       requests: [],
       cloudActive: false,
+      cloudError: null,
 
       syncFromCloud: async () => {
         const mod = await cloud();
@@ -176,21 +179,33 @@ export const useDataStore = create<DataState>()(
         try {
           const data = await mod.fetchCatalog();
           if (data) {
+            // Base de datos vacía (nueva) pero este navegador tiene catálogo: se sube en vez de
+            // machacar lo local con una lista vacía
+            const local = get();
+            if (data.cameras.length === 0 && local.cameras.length > 0) {
+              await mod.upsertCameras(local.cameras);
+              data.cameras = local.cameras;
+            }
+            if (data.lenses.length === 0 && local.lenses.length > 0) {
+              await mod.upsertLenses(local.lenses);
+              data.lenses = local.lenses;
+            }
+            const synced = { cameras: data.cameras, lenses: data.lenses, requests: data.requests, cloudActive: true, cloudError: null };
             if (data.users === null) {
               // Tabla app_users no creada aún: sincroniza catálogos y mantén usuarios locales
-              set({ cameras: data.cameras, lenses: data.lenses, requests: data.requests, cloudActive: true });
+              set(synced);
             } else if (data.users.length === 0) {
               // Primera sincronización: sube los usuarios locales (al menos el admin inicial)
               bestEffort(() => mod.upsertUsers(get().users));
-              set({ cameras: data.cameras, lenses: data.lenses, requests: data.requests, cloudActive: true });
+              set(synced);
             } else {
               const healedUsers = await healPlaintextPasswords(data.users);
-              set({ users: healedUsers, cameras: data.cameras, lenses: data.lenses, requests: data.requests, cloudActive: true });
+              set({ ...synced, users: healedUsers });
             }
           }
         } catch (e: any) {
           console.warn('[Supabase] no se pudo sincronizar:', e?.message || e);
-          set({ cloudActive: false });
+          set({ cloudActive: false, cloudError: e?.message || String(e) });
         }
       },
 
@@ -297,6 +312,10 @@ export const useDataStore = create<DataState>()(
 
       removeSet: (id) => set((s) => ({ savedSets: s.savedSets.filter((x) => x.id !== id) })),
     }),
-    { name: 'rust-lens-data' }
+    {
+      name: 'rust-lens-data',
+      // El estado de conexión se recalcula en cada carga; no se guarda en el navegador
+      partialize: ({ cloudActive, cloudError, ...rest }) => rest,
+    }
   )
 );

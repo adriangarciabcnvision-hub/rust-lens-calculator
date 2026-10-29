@@ -31,6 +31,7 @@ const TABS = [
 export default function AppPage() {
   const [activeTab, setActiveTab] = useState('calculator');
   const [showHelp, setShowHelp] = useState(false);
+  const cloudError = useDataStore((s) => s.cloudError);
 
   // Si hay Supabase configurado, carga el catálogo compartido al arrancar
   useEffect(() => {
@@ -79,6 +80,13 @@ export default function AppPage() {
           </div>
         </div>
       </div>
+
+      {/* Sin conexión con Supabase: lo que se importe solo quedará en este navegador */}
+      {cloudError && (
+        <div className="bg-red-900/80 border-b border-red-700 text-red-100 text-xs px-4 py-1.5 flex-shrink-0">
+          ⚠️ Sin conexión con la base de datos compartida. Los cambios solo se guardan en este navegador y no los verán otros dispositivos.
+        </div>
+      )}
 
       {/* Content - Sin scroll */}
       {/* Todas las pestañas se quedan montadas (solo se ocultan con CSS): cambiar de
